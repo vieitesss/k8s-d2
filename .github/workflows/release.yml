@@ -44,15 +44,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run GoReleaser (Snapshot)
+      - name: Build snapshot (macOS ARM only)
         if: steps.check_branch.outputs.on_main == 'false'
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          distribution: goreleaser
-          version: latest
-          args: release --snapshot --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X main.version=${{ github.ref_name }}-snapshot" -o dist/k8sdd .
 
       - name: Upload snapshot artifacts
         if: steps.check_branch.outputs.on_main == 'false'
