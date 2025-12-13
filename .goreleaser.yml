@@ -60,8 +60,6 @@ brews:
     repository:
       owner: vieitesss
       name: homebrew-tap
-      token: "{{ .Env.GITHUB_TOKEN }}"
-    folder: Formula
     homepage: https://github.com/vieitesss/k8s-d2
     description: Generate D2 diagrams from Kubernetes cluster topology
     license: MIT
