@@ -52,6 +52,14 @@ changelog:
     - title: Others
       order: 999
 
+release:
+  github:
+    owner: vieitesss
+    name: k8s-d2
+  name_template: "v{{.Version}}"
+  draft: false
+  prerelease: auto
+
 brews:
   - repository:
       owner: vieitesss
