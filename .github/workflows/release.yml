@@ -2,8 +2,6 @@ name: Release
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
 
@@ -19,16 +17,39 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check if tag is on main branch
+        id: check_branch
+        run: |
+          git fetch origin main
+          if git branch -r --contains ${{ github.ref }} | grep -q 'origin/main'; then
+            echo "on_main=true" >> $GITHUB_OUTPUT
+            echo "Tag is on main branch - will create release"
+          else
+            echo "on_main=false" >> $GITHUB_OUTPUT
+            echo "Tag is NOT on main branch - will create snapshot only"
+          fi
+
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version: '1.25.4'
 
-      - name: Run GoReleaser
+      - name: Run GoReleaser (Release)
+        if: steps.check_branch.outputs.on_main == 'true'
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
           args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run GoReleaser (Snapshot)
+        if: steps.check_branch.outputs.on_main == 'false'
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --snapshot --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
