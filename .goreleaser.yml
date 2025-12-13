@@ -26,17 +26,15 @@ archives:
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else }}{{ .Arch }}{{ end }}
-    format_overrides:
-      - goos: windows
-        format: zip
     files:
       - README.md
+    rlcp: true
 
 checksum:
   name_template: 'checksums.txt'
 
 snapshot:
-  name_template: "{{ incpatch .Version }}-snapshot"
+  version_template: "{{ incpatch .Version }}-snapshot"
 
 changelog:
   sort: asc
@@ -56,14 +54,9 @@ changelog:
       order: 999
 
 brews:
-  - name: k8s-d2
-    repository:
+  - repository:
       owner: vieitesss
       name: homebrew-tap
     homepage: https://github.com/vieitesss/k8s-d2
     description: Generate D2 diagrams from Kubernetes cluster topology
     license: MIT
-    install: |
-      bin.install "k8sdd"
-    test: |
-      system "#{bin}/k8sdd", "--version"
