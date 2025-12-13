@@ -1,0 +1,15 @@
+# Development files
+.claude/
+.gemini-clipboard/
+CLAUDE.md
+GEMINI.md
+
+# Build artifacts
+k8s-d2
+k8sdd
+dist/
+
+# Test outputs
+cluster*
+*.d2
+*.svg
