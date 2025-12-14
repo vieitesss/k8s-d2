@@ -5,7 +5,8 @@ before:
     - go mod tidy
 
 builds:
-  - binary: k8sdd
+  - id: default
+    binary: k8sdd
     env:
       - CGO_ENABLED=0
     goos:
@@ -19,7 +20,8 @@ builds:
       - -s -w -X main.version={{.Version}}
 
 archives:
-  - format: tar.gz
+  - id: default
+    formats: [tar.gz]
     name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
@@ -28,7 +30,7 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
     files:
       - README.md
 
@@ -60,8 +62,13 @@ release:
   draft: false
   prerelease: auto
 
-brews:
-  - repository:
+homebrew_casks:
+  - name: k8s-d2
+    ids:
+      - default
+    binaries:
+      - k8sdd
+    repository:
       owner: vieitesss
       name: homebrew-tap
     homepage: https://github.com/vieitesss/k8s-d2
