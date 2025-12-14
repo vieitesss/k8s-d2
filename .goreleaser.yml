@@ -1,3 +1,5 @@
+version: 2
+
 before:
   hooks:
     - go mod tidy
@@ -33,9 +35,6 @@ archives:
 checksum:
   name_template: 'checksums.txt'
 
-snapshot:
-  name_template: "{{ incpatch .Version }}-snapshot"
-
 changelog:
   sort: asc
   filters:
@@ -53,17 +52,18 @@ changelog:
     - title: Others
       order: 999
 
+release:
+  github:
+    owner: vieitesss
+    name: k8s-d2
+  name_template: "v{{.Version}}"
+  draft: false
+  prerelease: auto
+
 brews:
-  - name: k8s-d2
-    repository:
+  - repository:
       owner: vieitesss
       name: homebrew-tap
-      token: "{{ .Env.GITHUB_TOKEN }}"
-    folder: Formula
     homepage: https://github.com/vieitesss/k8s-d2
     description: Generate D2 diagrams from Kubernetes cluster topology
     license: MIT
-    install: |
-      bin.install "k8sdd"
-    test: |
-      system "#{bin}/k8sdd", "--version"
