@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/charmbracelet/huh/spinner"
+	"github.com/charmbracelet/log"
 	"github.com/vieitesss/k8s-d2/pkg/kube"
 	"github.com/vieitesss/k8s-d2/pkg/model"
 	"github.com/vieitesss/k8s-d2/pkg/render"
@@ -12,6 +13,17 @@ import (
 )
 
 func runGenerate(cmd *cobra.Command, args []string) error {
+	// Configure prettier logging
+	log.SetReportTimestamp(false)
+
+	// Suppress k8s/AWS SDK stderr output globally
+	oldStderr := os.Stderr
+	devNull, _ := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	defer func() {
+		os.Stderr = oldStderr
+		devNull.Close()
+	}()
+
 	var client *kube.Client
 	var cluster *model.Cluster
 	var err error
@@ -19,7 +31,9 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	err = spinner.New().
 		Title("Creating K8s client...").
 		Action(func() {
+			os.Stderr = devNull
 			client, err = kube.NewClient(kubeconfig)
+			os.Stderr = oldStderr
 		}).
 		Run()
 	if err != nil {
@@ -35,11 +49,19 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	err = spinner.New().
 		Title("Fetching cluster topology...").
 		Action(func() {
+			os.Stderr = devNull
 			cluster, err = client.FetchTopology(cmd.Context(), opts)
+			os.Stderr = oldStderr
 		}).
 		Run()
 	if err != nil {
+		log.Error("Failed to fetch cluster topology", "error", err)
 		return err
+	}
+
+	if cluster == nil {
+		log.Error("Authentication failed", "message", "Your Kubernetes credentials are expired or invalid")
+		return fmt.Errorf("authentication failed")
 	}
 
 	w := os.Stdout
@@ -63,6 +85,6 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintln(os.Stderr, "✓ Done")
+	log.Info("D2 diagram generated successfully")
 	return nil
 }
