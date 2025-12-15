@@ -6,10 +6,10 @@ import (
 
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/log"
+	"github.com/spf13/cobra"
 	"github.com/vieitesss/k8s-d2/pkg/kube"
 	"github.com/vieitesss/k8s-d2/pkg/model"
 	"github.com/vieitesss/k8s-d2/pkg/render"
-	"github.com/spf13/cobra"
 )
 
 func runGenerate(cmd *cobra.Command, args []string) error {
