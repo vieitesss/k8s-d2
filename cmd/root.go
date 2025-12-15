@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +19,9 @@ var rootCmd = &cobra.Command{
 	Short: "Generate D2 diagrams from Kubernetes cluster topology",
 	Long: `k8s-d2 queries your Kubernetes cluster and generates D2 diagram files
 visualizing namespaces, workloads, services, and their relationships.`,
-	RunE: runGenerate,
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	RunE:          runGenerate,
 }
 
 func init() {
@@ -35,10 +34,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "show version information")
 }
 
-func Execute(version string) {
+func Execute(version string) error {
 	rootCmd.Version = version
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	return rootCmd.Execute()
 }
