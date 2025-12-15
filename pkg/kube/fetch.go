@@ -57,9 +57,39 @@ func (c *Client) getNamespaces(ctx context.Context, opts FetchOptions) ([]string
 func (c *Client) fetchNamespace(ctx context.Context, nsName string, opts FetchOptions) (*model.Namespace, error) {
 	ns := &model.Namespace{Name: nsName}
 
+	if err := c.fetchDeployments(ctx, nsName, ns); err != nil {
+		return nil, err
+	}
+
+	if err := c.fetchStatefulSets(ctx, nsName, ns); err != nil {
+		return nil, err
+	}
+
+	if err := c.fetchDaemonSets(ctx, nsName, ns); err != nil {
+		return nil, err
+	}
+
+	if err := c.fetchServices(ctx, nsName, ns); err != nil {
+		return nil, err
+	}
+
+	if err := c.fetchConfigMapsAndSecrets(ctx, nsName, ns); err != nil {
+		return nil, err
+	}
+
+	if opts.IncludeStorage {
+		if err := c.fetchPVCs(ctx, nsName, ns); err != nil {
+			return nil, err
+		}
+	}
+
+	return ns, nil
+}
+
+func (c *Client) fetchDeployments(ctx context.Context, nsName string, ns *model.Namespace) error {
 	deps, err := c.clientset.AppsV1().Deployments(nsName).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, d := range deps.Items {
 		ns.Deployments = append(ns.Deployments, model.Workload{
@@ -69,10 +99,13 @@ func (c *Client) fetchNamespace(ctx context.Context, nsName string, opts FetchOp
 			Labels:   d.Spec.Selector.MatchLabels,
 		})
 	}
+	return nil
+}
 
+func (c *Client) fetchStatefulSets(ctx context.Context, nsName string, ns *model.Namespace) error {
 	ssets, err := c.clientset.AppsV1().StatefulSets(nsName).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, ss := range ssets.Items {
 		ns.StatefulSets = append(ns.StatefulSets, model.Workload{
@@ -82,10 +115,13 @@ func (c *Client) fetchNamespace(ctx context.Context, nsName string, opts FetchOp
 			Labels:   ss.Spec.Selector.MatchLabels,
 		})
 	}
+	return nil
+}
 
+func (c *Client) fetchDaemonSets(ctx context.Context, nsName string, ns *model.Namespace) error {
 	dsets, err := c.clientset.AppsV1().DaemonSets(nsName).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, ds := range dsets.Items {
 		ns.DaemonSets = append(ns.DaemonSets, model.Workload{
@@ -95,10 +131,13 @@ func (c *Client) fetchNamespace(ctx context.Context, nsName string, opts FetchOp
 			Labels:   ds.Spec.Selector.MatchLabels,
 		})
 	}
+	return nil
+}
 
+func (c *Client) fetchServices(ctx context.Context, nsName string, ns *model.Namespace) error {
 	svcs, err := c.clientset.CoreV1().Services(nsName).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, svc := range svcs.Items {
 		ports := []model.Port{}
@@ -116,43 +155,47 @@ func (c *Client) fetchNamespace(ctx context.Context, nsName string, opts FetchOp
 			Ports:    ports,
 		})
 	}
+	return nil
+}
 
+func (c *Client) fetchConfigMapsAndSecrets(ctx context.Context, nsName string, ns *model.Namespace) error {
 	cms, err := c.clientset.CoreV1().ConfigMaps(nsName).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	ns.ConfigMaps = len(cms.Items)
 
 	secrets, err := c.clientset.CoreV1().Secrets(nsName).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	ns.Secrets = len(secrets.Items)
 
-	if opts.IncludeStorage {
-		pvcs, err := c.clientset.CoreV1().PersistentVolumeClaims(nsName).List(ctx, metav1.ListOptions{})
-		if err != nil {
-			return nil, err
-		}
-		for _, pvc := range pvcs.Items {
-			storageClass := ""
-			if pvc.Spec.StorageClassName != nil {
-				storageClass = *pvc.Spec.StorageClassName
-			}
-			capacity := ""
-			if storage, ok := pvc.Status.Capacity["storage"]; ok {
-				capacity = storage.String()
-			}
-			ns.PVCs = append(ns.PVCs, model.PVC{
-				Name:         pvc.Name,
-				StorageClass: storageClass,
-				Capacity:     capacity,
-				BoundPod:     "", // TODO: determine which pod uses this PVC
-			})
-		}
-	}
+	return nil
+}
 
-	return ns, nil
+func (c *Client) fetchPVCs(ctx context.Context, nsName string, ns *model.Namespace) error {
+	pvcs, err := c.clientset.CoreV1().PersistentVolumeClaims(nsName).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, pvc := range pvcs.Items {
+		storageClass := ""
+		if pvc.Spec.StorageClassName != nil {
+			storageClass = *pvc.Spec.StorageClassName
+		}
+		capacity := ""
+		if storage, ok := pvc.Status.Capacity["storage"]; ok {
+			capacity = storage.String()
+		}
+		ns.PVCs = append(ns.PVCs, model.PVC{
+			Name:         pvc.Name,
+			StorageClass: storageClass,
+			Capacity:     capacity,
+			BoundPod:     "", // TODO: determine which pod uses this PVC
+		})
+	}
+	return nil
 }
 
 func isSystemNamespace(name string) bool {
