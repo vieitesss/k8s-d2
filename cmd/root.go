@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 )
 
@@ -36,9 +34,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "show version information")
 }
 
-func Execute(version string) {
+func Execute(version string) error {
 	rootCmd.Version = version
-	if err := rootCmd.Execute(); err != nil {
-		os.Exit(1)
-	}
+	return rootCmd.Execute()
 }
