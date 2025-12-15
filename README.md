@@ -32,24 +32,23 @@ go install github.com/vieitesss/k8s-d2@latest
 
 ### Pre-compiled Binaries
 
-Download the latest release for your platform from the [releases page](https://github.com/vieitesss/k8s-d2/releases).
+Download the latest release for your platform from the [releases page](https://github.com/vieitesss/k8s-d2/releases):
 
-**Linux (amd64):**
+1. Choose the appropriate archive for your system:
+   - Linux (x86_64): `k8s-d2_*_Linux_x86_64.tar.gz`
+   - Linux (ARM64): `k8s-d2_*_Linux_arm64.tar.gz`
+   - macOS (Intel): `k8s-d2_*_Darwin_x86_64.tar.gz`
+   - macOS (Apple Silicon): `k8s-d2_*_Darwin_arm64.tar.gz`
+   - Windows: `k8s-d2_*_Windows_*.zip`
+
+2. Extract the archive and move the `k8sdd` binary to your PATH:
+
 ```bash
-curl -LO https://github.com/vieitesss/k8s-d2/releases/latest/download/k8s-d2_Linux_x86_64.tar.gz
-tar -xzf k8s-d2_Linux_x86_64.tar.gz
-sudo mv k8sdd /usr/local/bin/
+tar -xzf k8s-d2_*_*.tar.gz
+sudo mv k8sdd /usr/local/bin/  # Linux/macOS
 ```
 
-**macOS (Apple Silicon):**
-```bash
-curl -LO https://github.com/vieitesss/k8s-d2/releases/latest/download/k8s-d2_Darwin_arm64.tar.gz
-tar -xzf k8s-d2_Darwin_arm64.tar.gz
-sudo mv k8sdd /usr/local/bin/
-```
-
-**Windows:**
-Download the `.zip` file from releases and add the extracted binary to your PATH.
+For Windows, extract the `.zip` file and add the binary to your PATH.
 
 ### Build from Source
 
