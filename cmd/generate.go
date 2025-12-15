@@ -18,10 +18,15 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 	// Suppress k8s/AWS SDK stderr output globally
 	oldStderr := os.Stderr
-	devNull, _ := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	devNull, devNullErr := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if devNullErr != nil {
+		return fmt.Errorf("failed to open /dev/null: %w", devNullErr)
+	}
 	defer func() {
 		os.Stderr = oldStderr
-		devNull.Close()
+		if devNull != nil {
+			devNull.Close()
+		}
 	}()
 
 	var client *kube.Client
@@ -55,13 +60,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		}).
 		Run()
 	if err != nil {
-		log.Error("Failed to fetch cluster topology", "error", err)
 		return err
-	}
-
-	if cluster == nil {
-		log.Error("Authentication failed", "message", "Your Kubernetes credentials are expired or invalid")
-		return fmt.Errorf("authentication failed")
 	}
 
 	w := os.Stdout
