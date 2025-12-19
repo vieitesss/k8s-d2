@@ -16,6 +16,9 @@ type FetchOptions struct {
 	IncludeStorage bool
 }
 
+// namespaceFetcher is a function that fetches a specific resource type into a namespace.
+type namespaceFetcher func(context.Context, string, *model.Namespace) error
+
 func (c *Client) FetchTopology(ctx context.Context, opts FetchOptions) (*model.Cluster, error) {
 	cluster := &model.Cluster{Name: "cluster"}
 
@@ -62,7 +65,7 @@ func (c *Client) filterNamespaceNames(items []corev1.Namespace, includeAll bool)
 func (c *Client) fetchNamespace(ctx context.Context, nsName string, opts FetchOptions) (*model.Namespace, error) {
 	ns := &model.Namespace{Name: nsName}
 
-	fetchers := []func(context.Context, string, *model.Namespace) error{
+	fetchers := []namespaceFetcher{
 		c.fetchDeployments,
 		c.fetchStatefulSets,
 		c.fetchDaemonSets,
