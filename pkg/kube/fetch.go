@@ -51,10 +51,10 @@ func (c *Client) getNamespaces(ctx context.Context, opts FetchOptions) ([]string
 	return c.filterNamespaceNames(list.Items, opts.AllNamespaces), nil
 }
 
-func (c *Client) filterNamespaceNames(items []corev1.Namespace, includeAll bool) []string {
+func (c *Client) filterNamespaceNames(items []corev1.Namespace, includeSystemNamespaces bool) []string {
 	var names []string
 	for _, ns := range items {
-		if !includeAll && isSystemNamespace(ns.Name) {
+		if !includeSystemNamespaces && isSystemNamespace(ns.Name) {
 			continue
 		}
 		names = append(names, ns.Name)
