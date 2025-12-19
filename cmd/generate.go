@@ -79,6 +79,9 @@ func fetchTopologyWithSpinner(ctx context.Context, client *kube.Client, opts kub
 	return cluster, fetchErr
 }
 
+// getOutputWriter returns the output file to write the diagram to, a cleanup
+// function, and an error. Callers should defer the returned cleanup function
+// to ensure any created file is properly closed.
 func getOutputWriter() (*os.File, func(), error) {
 	if output == "" {
 		return os.Stdout, func() {}, nil
