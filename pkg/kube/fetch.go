@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/vieitesss/k8s-d2/pkg/model"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -44,41 +45,37 @@ func (c *Client) getNamespaces(ctx context.Context, opts FetchOptions) ([]string
 		return nil, err
 	}
 
+	return c.filterNamespaceNames(list.Items, opts.AllNamespaces), nil
+}
+
+func (c *Client) filterNamespaceNames(items []corev1.Namespace, includeAll bool) []string {
 	var names []string
-	for _, ns := range list.Items {
-		if !opts.AllNamespaces && isSystemNamespace(ns.Name) {
+	for _, ns := range items {
+		if !includeAll && isSystemNamespace(ns.Name) {
 			continue
 		}
 		names = append(names, ns.Name)
 	}
-	return names, nil
+	return names
 }
 
 func (c *Client) fetchNamespace(ctx context.Context, nsName string, opts FetchOptions) (*model.Namespace, error) {
 	ns := &model.Namespace{Name: nsName}
 
-	if err := c.fetchDeployments(ctx, nsName, ns); err != nil {
-		return nil, err
-	}
-
-	if err := c.fetchStatefulSets(ctx, nsName, ns); err != nil {
-		return nil, err
-	}
-
-	if err := c.fetchDaemonSets(ctx, nsName, ns); err != nil {
-		return nil, err
-	}
-
-	if err := c.fetchServices(ctx, nsName, ns); err != nil {
-		return nil, err
-	}
-
-	if err := c.fetchConfigMapsAndSecrets(ctx, nsName, ns); err != nil {
-		return nil, err
+	fetchers := []func(context.Context, string, *model.Namespace) error{
+		c.fetchDeployments,
+		c.fetchStatefulSets,
+		c.fetchDaemonSets,
+		c.fetchServices,
+		c.fetchConfigMapsAndSecrets,
 	}
 
 	if opts.IncludeStorage {
-		if err := c.fetchPVCs(ctx, nsName, ns); err != nil {
+		fetchers = append(fetchers, c.fetchPVCs)
+	}
+
+	for _, fetch := range fetchers {
+		if err := fetch(ctx, nsName, ns); err != nil {
 			return nil, err
 		}
 	}

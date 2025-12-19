@@ -52,54 +52,63 @@ func (r *D2Renderer) renderNamespaceIndented(ns *model.Namespace, indent string)
 	nsID := sanitizeID(ns.Name)
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf("%s%s: {\n", indent, nsID))
-	b.WriteString(fmt.Sprintf("%s  label: %s\n", indent, ns.Name))
-	b.WriteString(fmt.Sprintf("%s  grid-columns: 3\n", indent))
-	b.WriteString(fmt.Sprintf("%s  style.fill: \"#f0f0f0\"\n\n", indent))
+	fmt.Fprintf(&b, "%s%s: {\n", indent, nsID)
+	fmt.Fprintf(&b, "%s  label: %s\n", indent, ns.Name)
+	fmt.Fprintf(&b, "%s  grid-columns: 3\n", indent)
+	fmt.Fprintf(&b, "%s  style.fill: \"#f0f0f0\"\n\n", indent)
 
-	for _, w := range ns.Deployments {
-		r.writeWorkload(&b, nsID, &w, indent)
-	}
-	for _, w := range ns.StatefulSets {
-		r.writeWorkload(&b, nsID, &w, indent)
-	}
-	for _, w := range ns.DaemonSets {
-		r.writeWorkload(&b, nsID, &w, indent)
-	}
-
-	for _, svc := range ns.Services {
-		r.writeService(&b, nsID, &svc, indent)
-	}
-
-	if ns.ConfigMaps > 0 || ns.Secrets > 0 {
-		b.WriteString(fmt.Sprintf("%s  _config: {\n", indent))
-		b.WriteString(fmt.Sprintf("%s    label: \"CM: %d | Sec: %d\"\n", indent, ns.ConfigMaps, ns.Secrets))
-		b.WriteString(fmt.Sprintf("%s    style.fill: \"#ffffcc\"\n", indent))
-		b.WriteString(fmt.Sprintf("%s  }\n", indent))
-	}
-
+	r.writeAllWorkloads(&b, ns, indent)
+	r.writeAllServices(&b, ns, indent)
+	r.writeConfigInfo(&b, ns, indent)
 	r.writeConnections(&b, ns, indent)
 
 	b.WriteString(fmt.Sprintf("%s}\n\n", indent))
 	fmt.Fprint(r.w, b.String())
 }
 
-func (r *D2Renderer) writeWorkload(b *strings.Builder, nsID string, w *model.Workload, indent string) {
+func (r *D2Renderer) writeAllWorkloads(b *strings.Builder, ns *model.Namespace, indent string) {
+	for _, w := range ns.Deployments {
+		r.writeWorkload(b, &w, indent)
+	}
+	for _, w := range ns.StatefulSets {
+		r.writeWorkload(b, &w, indent)
+	}
+	for _, w := range ns.DaemonSets {
+		r.writeWorkload(b, &w, indent)
+	}
+}
+
+func (r *D2Renderer) writeAllServices(b *strings.Builder, ns *model.Namespace, indent string) {
+	for _, svc := range ns.Services {
+		r.writeService(b, &svc, indent)
+	}
+}
+
+func (r *D2Renderer) writeConfigInfo(b *strings.Builder, ns *model.Namespace, indent string) {
+	if ns.ConfigMaps > 0 || ns.Secrets > 0 {
+		fmt.Fprintf(b, "%s  _config: {\n", indent)
+		fmt.Fprintf(b, "%s    label: \"CM: %d | Sec: %d\"\n", indent, ns.ConfigMaps, ns.Secrets)
+		fmt.Fprintf(b, "%s    style.fill: \"#ffffcc\"\n", indent)
+		fmt.Fprintf(b, "%s  }\n", indent)
+	}
+}
+
+func (r *D2Renderer) writeWorkload(b *strings.Builder, w *model.Workload, indent string) {
 	wID := sanitizeID(w.Name)
 	icon := workloadIcon(w.Kind)
 
-	b.WriteString(fmt.Sprintf("%s  %s: {\n", indent, wID))
-	b.WriteString(fmt.Sprintf("%s    label: \"%s %s (%d)\"\n", indent, icon, w.Name, w.Replicas))
-	b.WriteString(fmt.Sprintf("%s  }\n", indent))
+	fmt.Fprintf(b, "%s  %s: {\n", indent, wID)
+	fmt.Fprintf(b, "%s    label: \"%s %s (%d)\"\n", indent, icon, w.Name, w.Replicas)
+	fmt.Fprintf(b, "%s  }\n", indent)
 }
 
-func (r *D2Renderer) writeService(b *strings.Builder, nsID string, svc *model.Service, indent string) {
+func (r *D2Renderer) writeService(b *strings.Builder, svc *model.Service, indent string) {
 	svcID := sanitizeID(svc.Name)
 
-	b.WriteString(fmt.Sprintf("%s  svc_%s: {\n", indent, svcID))
-	b.WriteString(fmt.Sprintf("%s    label: \"⎈ %s\\n%s\"\n", indent, svc.Name, svc.Type))
-	b.WriteString(fmt.Sprintf("%s    style.fill: \"#cce5ff\"\n", indent))
-	b.WriteString(fmt.Sprintf("%s  }\n", indent))
+	fmt.Fprintf(b, "%s  svc_%s: {\n", indent, svcID)
+	fmt.Fprintf(b, "%s    label: \"⎈ %s\\n%s\"\n", indent, svc.Name, svc.Type)
+	fmt.Fprintf(b, "%s    style.fill: \"#cce5ff\"\n", indent)
+	fmt.Fprintf(b, "%s  }\n", indent)
 }
 
 func (r *D2Renderer) writeConnections(b *strings.Builder, ns *model.Namespace, indent string) {
@@ -107,16 +116,19 @@ func (r *D2Renderer) writeConnections(b *strings.Builder, ns *model.Namespace, i
 		if len(svc.Selector) == 0 {
 			continue
 		}
+		r.writeServiceConnections(b, &svc, ns, indent)
+	}
+}
 
-		svcID := sanitizeID(svc.Name)
+func (r *D2Renderer) writeServiceConnections(b *strings.Builder, svc *model.Service, ns *model.Namespace, indent string) {
+	svcID := sanitizeID(svc.Name)
+	allWorkloads := [][]model.Workload{ns.Deployments, ns.StatefulSets, ns.DaemonSets}
 
-		allWorkloads := [][]model.Workload{ns.Deployments, ns.StatefulSets, ns.DaemonSets}
-		for _, workloads := range allWorkloads {
-			for _, w := range workloads {
-				if labelsMatch(svc.Selector, w.Labels) {
-					wID := sanitizeID(w.Name)
-					b.WriteString(fmt.Sprintf("%s  svc_%s -> %s\n", indent, svcID, wID))
-				}
+	for _, workloads := range allWorkloads {
+		for _, w := range workloads {
+			if labelsMatch(svc.Selector, w.Labels) {
+				wID := sanitizeID(w.Name)
+				fmt.Fprintf(b, "%s  svc_%s -> %s\n", indent, svcID, wID)
 			}
 		}
 	}

@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"fmt"
+	"context"
 	"os"
 
 	"github.com/charmbracelet/huh/spinner"
@@ -13,34 +13,9 @@ import (
 )
 
 func runGenerate(cmd *cobra.Command, args []string) error {
-	// Configure prettier logging
 	log.SetReportTimestamp(false)
 
-	// Suppress k8s/AWS SDK stderr output globally
-	oldStderr := os.Stderr
-	devNull, devNullErr := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
-	if devNullErr != nil {
-		return fmt.Errorf("failed to open /dev/null: %w", devNullErr)
-	}
-	defer func() {
-		os.Stderr = oldStderr
-		if devNull != nil {
-			devNull.Close()
-		}
-	}()
-
-	var client *kube.Client
-	var cluster *model.Cluster
-	var err error
-
-	err = spinner.New().
-		Title("Creating K8s client...").
-		Action(func() {
-			os.Stderr = devNull
-			client, err = kube.NewClient(kubeconfig)
-			os.Stderr = oldStderr
-		}).
-		Run()
+	client, err := createClientWithSpinner()
 	if err != nil {
 		return err
 	}
@@ -51,39 +26,84 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		IncludeStorage: includeStorage,
 	}
 
-	err = spinner.New().
-		Title("Fetching cluster topology...").
-		Action(func() {
-			os.Stderr = devNull
-			cluster, err = client.FetchTopology(cmd.Context(), opts)
-			os.Stderr = oldStderr
-		}).
-		Run()
+	cluster, err := fetchTopologyWithSpinner(cmd.Context(), client, opts)
 	if err != nil {
 		return err
 	}
 
-	w := os.Stdout
-	if output != "" {
-		f, err := os.Create(output)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		w = f
-	}
-
-	err = spinner.New().
-		Title("Rendering D2 diagram...").
-		Action(func() {
-			renderer := render.NewD2Renderer(w, gridColumns)
-			err = renderer.Render(cluster)
-		}).
-		Run()
+	w, closeWriter, err := getOutputWriter()
 	if err != nil {
+		return err
+	}
+	defer closeWriter()
+
+	if err := renderWithSpinner(cluster, w); err != nil {
 		return err
 	}
 
 	log.Info("D2 diagram generated successfully")
 	return nil
+}
+
+func createClientWithSpinner() (*kube.Client, error) {
+	var client *kube.Client
+	var clientErr error
+
+	spinnerErr := spinner.New().
+		Title("Creating K8s client...").
+		Action(func() {
+			client, clientErr = kube.NewClient(kubeconfig)
+		}).
+		Run()
+
+	if spinnerErr != nil {
+		return nil, spinnerErr
+	}
+	return client, clientErr
+}
+
+func fetchTopologyWithSpinner(ctx context.Context, client *kube.Client, opts kube.FetchOptions) (*model.Cluster, error) {
+	var cluster *model.Cluster
+	var fetchErr error
+
+	spinnerErr := spinner.New().
+		Title("Fetching cluster topology...").
+		Action(func() {
+			cluster, fetchErr = client.FetchTopology(ctx, opts)
+		}).
+		Run()
+
+	if spinnerErr != nil {
+		return nil, spinnerErr
+	}
+	return cluster, fetchErr
+}
+
+func getOutputWriter() (*os.File, func(), error) {
+	if output == "" {
+		return os.Stdout, func() {}, nil
+	}
+
+	f, err := os.Create(output)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return f, func() { f.Close() }, nil
+}
+
+func renderWithSpinner(cluster *model.Cluster, w *os.File) error {
+	var renderErr error
+	spinnerErr := spinner.New().
+		Title("Rendering D2 diagram...").
+		Action(func() {
+			renderer := render.NewD2Renderer(w, gridColumns)
+			renderErr = renderer.Render(cluster)
+		}).
+		Run()
+
+	if spinnerErr != nil {
+		return spinnerErr
+	}
+	return renderErr
 }
