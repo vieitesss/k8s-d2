@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
+type RootOptions struct {
 	kubeconfig     string
 	namespace      string
 	allNamespaces  bool
@@ -12,7 +12,9 @@ var (
 	includeStorage bool
 	gridColumns    int
 	showVersion    bool
-)
+}
+
+var rootOptions RootOptions
 
 var rootCmd = &cobra.Command{
 	Use:   "k8sdd",
@@ -25,13 +27,13 @@ visualizing namespaces, workloads, services, and their relationships.`,
 }
 
 func init() {
-	rootCmd.Flags().StringVar(&kubeconfig, "kubeconfig", "", "path to kubeconfig (default: ~/.kube/config)")
-	rootCmd.Flags().StringVarP(&namespace, "namespace", "n", "", "namespace to visualize (default: all non-system)")
-	rootCmd.Flags().BoolVarP(&allNamespaces, "all-namespaces", "A", false, "include all namespaces (including system)")
-	rootCmd.Flags().StringVarP(&output, "output", "o", "", "output file (default: stdout)")
-	rootCmd.Flags().BoolVar(&includeStorage, "include-storage", false, "include PVC/StorageClass layer")
-	rootCmd.Flags().IntVar(&gridColumns, "grid-columns", 3, "number of columns in grid layout (0 for single column)")
-	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "show version information")
+	rootCmd.Flags().StringVar(&rootOptions.kubeconfig, "kubeconfig", "", "path to kubeconfig (default: ~/.kube/config)")
+	rootCmd.Flags().StringVarP(&rootOptions.namespace, "namespace", "n", "", "namespace to visualize (default: all non-system)")
+	rootCmd.Flags().BoolVarP(&rootOptions.allNamespaces, "all-namespaces", "A", false, "include all namespaces (including system)")
+	rootCmd.Flags().StringVarP(&rootOptions.output, "output", "o", "", "output file (default: stdout)")
+	rootCmd.Flags().BoolVar(&rootOptions.includeStorage, "include-storage", false, "include PVC/StorageClass layer")
+	rootCmd.Flags().IntVar(&rootOptions.gridColumns, "grid-columns", 3, "number of columns in grid layout (0 for single column)")
+	rootCmd.Flags().BoolVarP(&rootOptions.showVersion, "version", "v", false, "show version information")
 }
 
 func Execute(version string) error {

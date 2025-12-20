@@ -21,9 +21,9 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	opts := kube.FetchOptions{
-		Namespace:      namespace,
-		AllNamespaces:  allNamespaces,
-		IncludeStorage: includeStorage,
+		Namespace:      rootOptions.namespace,
+		AllNamespaces:  rootOptions.allNamespaces,
+		IncludeStorage: rootOptions.includeStorage,
 	}
 
 	cluster, err := fetchTopologyWithSpinner(cmd.Context(), client, opts)
@@ -52,7 +52,7 @@ func createClientWithSpinner() (*kube.Client, error) {
 	spinnerErr := spinner.New().
 		Title("Creating K8s client...").
 		Action(func() {
-			client, clientErr = kube.NewClient(kubeconfig)
+			client, clientErr = kube.NewClient(rootOptions.kubeconfig)
 		}).
 		Run()
 
@@ -83,11 +83,11 @@ func fetchTopologyWithSpinner(ctx context.Context, client *kube.Client, opts kub
 // function, and an error. Callers should defer the returned cleanup function
 // to ensure any created file is properly closed.
 func getOutputWriter() (*os.File, func(), error) {
-	if output == "" {
+	if rootOptions.output == "" {
 		return os.Stdout, func() {}, nil
 	}
 
-	f, err := os.Create(output)
+	f, err := os.Create(rootOptions.output)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -100,7 +100,7 @@ func renderWithSpinner(cluster *model.Cluster, w *os.File) error {
 	spinnerErr := spinner.New().
 		Title("Rendering D2 diagram...").
 		Action(func() {
-			renderer := render.NewD2Renderer(w, gridColumns)
+			renderer := render.NewD2Renderer(w, rootOptions.gridColumns)
 			renderErr = renderer.Render(cluster)
 		}).
 		Run()
