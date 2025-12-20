@@ -22,10 +22,10 @@ jobs:
         run: |
           git fetch origin main
           if git branch -r --contains ${{ github.ref }} | grep -q 'origin/main'; then
-            echo "on_main=true" >> $GITHUB_OUTPUT
+            echo "on_main=true" >> "$GITHUB_OUTPUT"
             echo "Tag is on main branch - will create release"
           else
-            echo "on_main=false" >> $GITHUB_OUTPUT
+            echo "on_main=false" >> "$GITHUB_OUTPUT"
             echo "Tag is NOT on main branch - will create snapshot only"
           fi
 
