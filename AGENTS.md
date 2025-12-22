@@ -1,5 +1,9 @@
 # AGENTS.md
 
+> **File Purpose**: Machine-readable instructions for AI coding agents (GitHub Copilot, Claude Code). Defines coding standards, workflows, and actionable guidelines.
+>
+> **Relationship to CLAUDE.md**: This file focuses on HOW to code (patterns, standards, checklists). For WHY architectural decisions were made and WHAT the system design is, see CLAUDE.md.
+
 ## Project Identity
 
 **What**: CLI tool generating D2 diagrams from Kubernetes cluster topology
@@ -196,7 +200,8 @@ When reviewing PRs, check:
 
 **Documentation**
 - [ ] README updated if adding user-facing feature
-- [ ] CLAUDE.md updated if changing architecture/patterns
+- [ ] CLAUDE.md updated if changing architecture or design decisions
+- [ ] AGENTS.md updated if changing coding patterns or AI workflows
 - [ ] Code comments explain "why" not "what"
 
 ## Boundaries
