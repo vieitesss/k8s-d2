@@ -22,7 +22,7 @@ build:
 run *parameters: build
 	./k8sdd {{parameters}}
 
-generate:
-	just run -o {{outputFile}}
+generate *parameters:
+	just run {{parameters}} -o {{outputFile}}
 	d2 {{outputFile}} {{outputImage}}
 	open {{outputImage}}
