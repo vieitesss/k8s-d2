@@ -14,7 +14,7 @@ snapshot:
 	git push -f origin "$name"
 
 tag version:
-	git tag v{{version}} && git push origin v{{version}}
+	git tag {{version}} && git push origin {{version}}
 
 build:
 	go build -o k8sdd
