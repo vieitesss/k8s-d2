@@ -60,6 +60,7 @@ func (r *D2Renderer) renderNamespaceIndented(ns *model.Namespace, indent string)
 	r.writeAllWorkloads(&b, ns, indent)
 	r.writeAllServices(&b, ns, indent)
 	r.writeConfigInfo(&b, ns, indent)
+	r.writePVCs(&b, ns, indent)
 	r.writeConnections(&b, ns, indent)
 
 	b.WriteString(fmt.Sprintf("%s}\n\n", indent))
@@ -89,6 +90,23 @@ func (r *D2Renderer) writeConfigInfo(b *strings.Builder, ns *model.Namespace, in
 		fmt.Fprintf(b, "%s  _config: {\n", indent)
 		fmt.Fprintf(b, "%s    label: \"CM: %d | Sec: %d\"\n", indent, ns.ConfigMaps, ns.Secrets)
 		fmt.Fprintf(b, "%s    style.fill: \"#ffffcc\"\n", indent)
+		fmt.Fprintf(b, "%s  }\n", indent)
+	}
+}
+
+func (r *D2Renderer) writePVCs(b *strings.Builder, ns *model.Namespace, indent string) {
+	for _, pvc := range ns.PVCs {
+		pvcID := sanitizeID(pvc.Name)
+		label := fmt.Sprintf("💾 %s", pvc.Name)
+		if pvc.Capacity != "" {
+			label = fmt.Sprintf("%s\\n%s", label, pvc.Capacity)
+		}
+		if pvc.StorageClass != "" {
+			label = fmt.Sprintf("%s\\n[%s]", label, pvc.StorageClass)
+		}
+		fmt.Fprintf(b, "%s  pvc_%s: {\n", indent, pvcID)
+		fmt.Fprintf(b, "%s    label: \"%s\"\n", indent, label)
+		fmt.Fprintf(b, "%s    style.fill: \"#e6f3ff\"\n", indent)
 		fmt.Fprintf(b, "%s  }\n", indent)
 	}
 }
@@ -196,6 +214,11 @@ legend: {
   config: {
     label: "ConfigMaps | Secrets"
     style.fill: "#ffffcc"
+  }
+
+  pvc: {
+    label: "💾 PVC"
+    style.fill: "#e6f3ff"
   }
 }
 `
