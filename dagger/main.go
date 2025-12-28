@@ -143,8 +143,6 @@ func (m *Dagger) runK8sD2(
 		WithExec(args).
 		File("/output/test.d2")
 
-	m.writeFile(ctx, file)
-
 	output, err := file.Contents(ctx)
 	
 	if err != nil {
@@ -152,8 +150,4 @@ func (m *Dagger) runK8sD2(
 	}
 
 	return output, nil
-}
-
-func (m *Dagger) writeFile(ctx context.Context, file *dagger.File) {
-	file.Export(ctx, "~/test.d2")
 }
