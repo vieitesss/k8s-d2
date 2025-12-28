@@ -1,0 +1,14 @@
+{
+  "name": "dagger",
+  "engineVersion": "v0.19.7",
+  "sdk": {
+    "source": "go"
+  },
+  "dependencies": [
+    {
+      "name": "kind",
+      "source": "github.com/prefapp/daggerverse/kind@42985961eb3d61fa98aa71d2f67922a933b5caa3",
+      "pin": "42985961eb3d61fa98aa71d2f67922a933b5caa3"
+    }
+  ]
+}
