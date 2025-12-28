@@ -134,17 +134,15 @@ func (m *Dagger) runK8sD2(
 		WithExec([]string{"mkdir", "-p", "/output"}).
 		WithWorkdir("/output")
 
-	args := []string{"k8sdd", "-n", "k8s-d2-test", "-o", "test.d2"}
+	outputFile := "/output/test.d2"
+	args := []string{"k8sdd", "-n", "k8s-d2-test", "-o", outputFile}
 	if includeStorage {
-		args = []string{"k8sdd", "-n", "k8s-d2-test", "--include-storage", "-o", "/output/test.d2"}
+		args = []string{"k8sdd", "-n", "k8s-d2-test", "--include-storage", "-o", outputFile}
 	}
 
-	file := ctr.
-		WithExec(args).
-		File("/output/test.d2")
+	file := ctr.WithExec(args).File(outputFile)
 
 	output, err := file.Contents(ctx)
-	
 	if err != nil {
 		return "", err
 	}
