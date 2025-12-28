@@ -36,7 +36,7 @@ func (m *Dagger) Run(
 	// Example: `tcp://localhost:3000`
 	kindSvc *dagger.Service,
 
-	// Your already created Kind cluster address.
+	// Directory containing kubeconfig files for your cluster.
 	// Example: `$HOME/.kube`
 	// +optional
 	kubeconfig *dagger.Directory,
