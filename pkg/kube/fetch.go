@@ -163,13 +163,29 @@ func (c *Client) fetchConfigMapsAndSecrets(ctx context.Context, nsName string, n
 	if err != nil {
 		return err
 	}
-	ns.ConfigMaps = len(cms.Items)
+
+	// Filter out system-managed ConfigMaps
+	userConfigMaps := 0
+	for _, cm := range cms.Items {
+		if !isSystemConfigMap(cm.Name) {
+			userConfigMaps++
+		}
+	}
+	ns.ConfigMaps = userConfigMaps
 
 	secrets, err := c.clientset.CoreV1().Secrets(nsName).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
-	ns.Secrets = len(secrets.Items)
+
+	// Filter out system-managed Secrets (service account tokens)
+	userSecrets := 0
+	for _, secret := range secrets.Items {
+		if !isSystemSecret(secret.Name, secret.Type) {
+			userSecrets++
+		}
+	}
+	ns.Secrets = userSecrets
 
 	return nil
 }
@@ -211,5 +227,45 @@ func isSystemNamespace(name string) bool {
 			return true
 		}
 	}
+	return false
+}
+
+func isSystemConfigMap(name string) bool {
+	// Known system-managed ConfigMaps
+	systemConfigMaps := []string{
+		"kube-root-ca.crt",      // Kubernetes cluster CA certificate (injected in all namespaces)
+		"istio-ca-root-cert",    // Istio service mesh CA certificate
+		"linkerd-config",        // Linkerd service mesh configuration
+	}
+
+	if slices.Contains(systemConfigMaps, name) {
+		return true
+	}
+
+	// Filter ConfigMaps with system prefixes
+	systemPrefixes := []string{"kube-", "openshift-"}
+	for _, prefix := range systemPrefixes {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isSystemSecret(name string, secretType corev1.SecretType) bool {
+	// Filter out service account token secrets
+	if secretType == corev1.SecretTypeServiceAccountToken {
+		return true
+	}
+
+	// Filter out other system secrets by prefix
+	systemPrefixes := []string{"default-token-", "sh.helm."}
+	for _, prefix := range systemPrefixes {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+
 	return false
 }
