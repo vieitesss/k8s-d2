@@ -45,7 +45,7 @@ func (m *Dagger) Run(
 	var err error
 
 	if kubeconfig != nil {
-		kindCtr, err = m.KindFromServive(ctx, kindSvc, kubeconfig)
+		kindCtr, err = m.KindFromService(ctx, kindSvc, kubeconfig)
 	} else {
 		kindCtr = m.KindFromModule(dockerSocket, kindSvc)
 	}

@@ -15,7 +15,7 @@ func (m *Dagger) KindFromModule(
 	}).Container()
 }
 
-func (m *Dagger) KindFromServive(
+func (m *Dagger) KindFromService(
 	ctx context.Context,
 	kindSvc *dagger.Service,
 	kubeconfig *dagger.Directory,
