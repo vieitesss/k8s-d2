@@ -19,6 +19,9 @@ spec:
         image: postgres:alpine
         env:
         - name: POSTGRES_PASSWORD
-          value: testpass
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: password
         ports:
         - containerPort: 5432
