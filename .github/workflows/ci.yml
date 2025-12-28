@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.4'
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+          args: --timeout=5m
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.4'
+
+      - name: Run tests with Dagger
+        uses: dagger/dagger-for-github@v8.2.0
+        with:
+          module: github.com/shykes/daggerverse/hello
+          call: >
+            run
+            --docker-socket /var/run/docker.sock
+            --kind-svc tcp://localhost:3000
+          cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
+          version: "v0.19.7"
