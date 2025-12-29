@@ -1,0 +1,6 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: k8s-d2-test
+nodes:
+  - role: control-plane
+  - role: worker

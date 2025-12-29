@@ -29,26 +29,38 @@ func (r *D2Renderer) Render(cluster *model.Cluster) error {
 direction: right
 
 `
-	fmt.Fprint(r.w, header)
+	if _, err := fmt.Fprint(r.w, header); err != nil {
+		return err
+	}
 
-	r.renderLegend()
+	if err := r.renderLegend(); err != nil {
+		return err
+	}
 
 	if r.gridColumns > 0 {
-		fmt.Fprintf(r.w, "namespaces: {\n  grid-columns: %d\n\n", r.gridColumns)
-		for _, ns := range cluster.Namespaces {
-			r.renderNamespaceIndented(&ns, "  ")
+		if _, err := fmt.Fprintf(r.w, "namespaces: {\n  grid-columns: %d\n\n", r.gridColumns); err != nil {
+			return err
 		}
-		fmt.Fprint(r.w, "}\n")
+		for _, ns := range cluster.Namespaces {
+			if err := r.renderNamespaceIndented(&ns, "  "); err != nil {
+				return err
+			}
+		}
+		if _, err := fmt.Fprint(r.w, "}\n"); err != nil {
+			return err
+		}
 	} else {
 		for _, ns := range cluster.Namespaces {
-			r.renderNamespaceIndented(&ns, "")
+			if err := r.renderNamespaceIndented(&ns, ""); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func (r *D2Renderer) renderNamespaceIndented(ns *model.Namespace, indent string) {
+func (r *D2Renderer) renderNamespaceIndented(ns *model.Namespace, indent string) error {
 	nsID := sanitizeID(ns.Name)
 	var b strings.Builder
 
@@ -64,7 +76,10 @@ func (r *D2Renderer) renderNamespaceIndented(ns *model.Namespace, indent string)
 	r.writeConnections(&b, ns, indent)
 
 	b.WriteString(fmt.Sprintf("%s}\n\n", indent))
-	fmt.Fprint(r.w, b.String())
+	if _, err := fmt.Fprint(r.w, b.String()); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *D2Renderer) writeAllWorkloads(b *strings.Builder, ns *model.Namespace, indent string) {
@@ -180,7 +195,7 @@ func workloadIcon(kind string) string {
 	}
 }
 
-func (r *D2Renderer) renderLegend() {
+func (r *D2Renderer) renderLegend() error {
 	legend := `
 legend: {
   label: "LEGEND"
@@ -222,5 +237,8 @@ legend: {
   }
 }
 `
-	fmt.Fprint(r.w, legend)
+	if _, err := fmt.Fprint(r.w, legend); err != nil {
+		return err
+	}
+	return nil
 }
