@@ -6,7 +6,7 @@
 
 A command-line tool that generates [D2](https://d2lang.com/) diagram files from Kubernetes cluster topology. Visualize your cluster's namespaces, workloads, services, and their relationships as code.
 
-![k8s-d2 Example Diagram](assets/example.svg)
+![k8s-d2 Example Diagram](assets/example.png)
 
 ## Features
 
