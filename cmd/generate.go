@@ -92,7 +92,7 @@ func getOutputWriter() (*os.File, func(), error) {
 		return nil, nil, err
 	}
 
-	return f, func() { f.Close() }, nil
+	return f, func() { _ = f.Close() }, nil
 }
 
 func renderWithSpinner(cluster *model.Cluster, w *os.File) error {
