@@ -101,7 +101,17 @@ func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) (string, e
 		return "", fmt.Errorf("storage validation failed: %w", err)
 	}
 
-	return "All tests passed! ✓\n- Basic topology validated\n- Storage layer validated\n- D2 syntax correct\n- All resources present", nil
+	// Test --quiet flag produces identical output
+	quietOutput, err := m.runK8sD2Quiet(ctx, kindBinFixCtr, false)
+	if err != nil {
+		return "", fmt.Errorf("k8s-d2 execution failed (quiet mode): %w", err)
+	}
+
+	if basicOutput != quietOutput {
+		return "", fmt.Errorf("quiet mode output differs from normal mode")
+	}
+
+	return "All tests passed! ✓\n- Basic topology validated\n- Storage layer validated\n- D2 syntax correct\n- All resources present\n- Quiet flag validated", nil
 }
 
 // build compiles k8s-d2 binary
@@ -138,6 +148,35 @@ func (m *Dagger) runK8sD2(
 	args := []string{"k8sdd", "-n", "k8s-d2-test", "-o", outputFile}
 	if includeStorage {
 		args = []string{"k8sdd", "-n", "k8s-d2-test", "--include-storage", "-o", outputFile}
+	}
+
+	file := ctr.WithExec(args).File(outputFile)
+
+	output, err := file.Contents(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return output, nil
+}
+
+// runK8sD2Quiet executes k8s-d2 with --quiet flag and returns D2 output
+func (m *Dagger) runK8sD2Quiet(
+	ctx context.Context,
+
+	// Container with k8sdd binary
+	ctr *dagger.Container,
+
+	includeStorage bool,
+) (string, error) {
+	ctr = ctr.
+		WithExec([]string{"mkdir", "-p", "/output"}).
+		WithWorkdir("/output")
+
+	outputFile := "/output/test-quiet.d2"
+	args := []string{"k8sdd", "-n", "k8s-d2-test", "-o", outputFile, "--quiet"}
+	if includeStorage {
+		args = []string{"k8sdd", "-n", "k8s-d2-test", "--include-storage", "-o", outputFile, "--quiet"}
 	}
 
 	file := ctr.WithExec(args).File(outputFile)
