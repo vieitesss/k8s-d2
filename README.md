@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/icon.png" width="150" alt="k8s-d2">
+  <img src="assets/icon_256.ico" width="150" alt="k8s-d2">
 </p>
 
 # k8s-d2
