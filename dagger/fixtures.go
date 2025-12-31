@@ -13,6 +13,17 @@ func ApplyFixtures(
 	fixturesDir *dagger.Directory,
 	includeStorage bool,
 ) (*dagger.Container, error) {
+	var err error
+
+	// Clean up existing namespace to ensure fresh state
+	kindContainer, err = kindContainer.
+		// Delete namespace if it exists (ignore if not found)
+		WithExec([]string{"kubectl", "delete", "namespace", "k8s-d2-test", "--ignore-not-found=true", "--wait=true", "--timeout=60s"}).
+		Sync(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to clean up namespace: %w", err)
+	}
+
 	// Apply base fixtures (sorted by filename to ensure correct order)
 	baseFixtures := []string{
 		"base/01-namespace.yaml",
@@ -25,7 +36,6 @@ func ApplyFixtures(
 
 	for _, fixture := range baseFixtures {
 		file := fixturesDir.File(fixture)
-		var err error
 		kindContainer, err = kindContainer.
 			WithMountedFile(fmt.Sprintf("/fixtures/%s", fixture), file).
 			WithExec([]string{"kubectl", "apply", "-f", fmt.Sprintf("/fixtures/%s", fixture)}).
@@ -44,7 +54,6 @@ func ApplyFixtures(
 
 		for _, fixture := range storageFixtures {
 			file := fixturesDir.File(fixture)
-			var err error
 			kindContainer, err = kindContainer.
 				WithMountedFile(fmt.Sprintf("/fixtures/%s", fixture), file).
 				WithExec([]string{"kubectl", "apply", "-f", fmt.Sprintf("/fixtures/%s", fixture)}).
