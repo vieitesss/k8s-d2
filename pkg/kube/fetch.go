@@ -139,7 +139,8 @@ func (c *Client) fetchStatefulSets(ctx context.Context, nsName string, ns *model
 		return err
 	}
 	for _, ss := range ssets.Items {
-		replicas := int32(0)
+		// Default to 1 replica if not specified (Kubernetes StatefulSet default)
+		replicas := int32(1)
 		if ss.Spec.Replicas != nil {
 			replicas = *ss.Spec.Replicas
 		}
