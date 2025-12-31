@@ -41,13 +41,20 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	log.Info("D2 diagram generated successfully")
+	if !rootOptions.quiet {
+		log.Info("D2 diagram generated successfully")
+	}
 	return nil
 }
 
 func createClientWithSpinner() (*kube.Client, error) {
 	var client *kube.Client
 	var clientErr error
+
+	if rootOptions.quiet {
+		client, clientErr = kube.NewClient(rootOptions.kubeconfig)
+		return client, clientErr
+	}
 
 	spinnerErr := spinner.New().
 		Title("Creating K8s client...").
@@ -65,6 +72,11 @@ func createClientWithSpinner() (*kube.Client, error) {
 func fetchTopologyWithSpinner(ctx context.Context, client *kube.Client, opts kube.FetchOptions) (*model.Cluster, error) {
 	var cluster *model.Cluster
 	var fetchErr error
+
+	if rootOptions.quiet {
+		cluster, fetchErr = client.FetchTopology(ctx, opts)
+		return cluster, fetchErr
+	}
 
 	spinnerErr := spinner.New().
 		Title("Fetching cluster topology...").
@@ -97,6 +109,13 @@ func getOutputWriter() (*os.File, func(), error) {
 
 func renderWithSpinner(cluster *model.Cluster, w *os.File) error {
 	var renderErr error
+
+	if rootOptions.quiet {
+		renderer := render.NewD2Renderer(w, rootOptions.gridColumns)
+		renderErr = renderer.Render(cluster)
+		return renderErr
+	}
+
 	spinnerErr := spinner.New().
 		Title("Rendering D2 diagram...").
 		Action(func() {
