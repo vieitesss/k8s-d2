@@ -98,9 +98,9 @@ func extractPVCNames(volumes []corev1.Volume) []string {
 	return pvcNames
 }
 
-// extractStatefulSetPVCNames extracts PVC names from a StatefulSet, including
-// both regular volumes and generated names from volumeClaimTemplates.
-func extractStatefulSetPVCNames(volumes []corev1.Volume, templates []corev1.PersistentVolumeClaim, ssName string, replicas int32) []string {
+// extractAllStatefulSetPVCNames extracts all PVC names from a StatefulSet, including
+// both regular pod volumes and generated names from volumeClaimTemplates.
+func extractAllStatefulSetPVCNames(volumes []corev1.Volume, templates []corev1.PersistentVolumeClaim, ssName string, replicas int32) []string {
 	// Start with regular pod volumes
 	pvcNames := extractPVCNames(volumes)
 
@@ -149,7 +149,7 @@ func (c *Client) fetchStatefulSets(ctx context.Context, nsName string, ns *model
 			Kind:     "StatefulSet",
 			Replicas: replicas,
 			Labels:   ss.Spec.Selector.MatchLabels,
-			PVCNames: extractStatefulSetPVCNames(
+			PVCNames: extractAllStatefulSetPVCNames(
 				ss.Spec.Template.Spec.Volumes,
 				ss.Spec.VolumeClaimTemplates,
 				ss.Name,
