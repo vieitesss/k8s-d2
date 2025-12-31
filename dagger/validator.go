@@ -95,8 +95,9 @@ func (v *D2Validator) ValidateConnections() error {
 // ValidateStorage checks that PVC nodes are present (for --include-storage tests)
 func (v *D2Validator) ValidateStorage() error {
 	expectedStorage := []string{
-		"data_volume", // PVC
-		"logs_volume", // PVC
+		"pvc_logs_volume",       // Static PVC for Deployment
+		"pvc_data_database_0",   // StatefulSet generated PVC for replica 0
+		"pvc_data_database_1",   // StatefulSet generated PVC for replica 1
 	}
 
 	for _, res := range expectedStorage {
@@ -104,6 +105,45 @@ func (v *D2Validator) ValidateStorage() error {
 			return fmt.Errorf("missing expected storage resource: %s", res)
 		}
 	}
+
+	return nil
+}
+
+// ValidatePVCRelationships checks that workloads using PVCs are properly rendered
+// and that StatefulSet-generated PVCs are present.
+func (v *D2Validator) ValidatePVCRelationships() error {
+	// Check that workloads known to use PVCs are present
+	workloadsWithPVCs := []string{
+		"api_backend", // Deployment with logs-volume PVC
+		"database",    // StatefulSet with volumeClaimTemplates
+	}
+
+	for _, workload := range workloadsWithPVCs {
+		if !strings.Contains(v.output, workload) {
+			return fmt.Errorf("missing workload that uses PVCs: %s", workload)
+		}
+	}
+
+	// Check for StatefulSet-generated PVCs (pattern: <templateName>-<statefulsetName>-<ordinal>)
+	// The database StatefulSet with 2 replicas should generate:
+	// - data-database-0
+	// - data-database-1
+	generatedPVCs := []string{
+		"pvc_data_database_0", // StatefulSet generated PVC for replica 0
+		"pvc_data_database_1", // StatefulSet generated PVC for replica 1
+	}
+
+	for _, pvc := range generatedPVCs {
+		if !strings.Contains(v.output, pvc) {
+			return fmt.Errorf("missing StatefulSet-generated PVC: %s", pvc)
+		}
+	}
+
+	// TODO: Once PVC-to-workload connections are rendered in D2 output,
+	// add validation for connections like:
+	// - pvc_logs_volume -> api_backend
+	// - pvc_data_database_0 -> database
+	// - pvc_data_database_1 -> database
 
 	return nil
 }

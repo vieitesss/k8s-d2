@@ -64,5 +64,20 @@ func ApplyFixtures(
 		}
 	}
 
+	// Wait for all workloads to be ready before proceeding
+	// This ensures StatefulSets have created all their PVCs
+	kindContainer, err = kindContainer.
+		// Wait for Deployments
+		WithExec([]string{"kubectl", "rollout", "status", "deployment/web-frontend", "-n", "k8s-d2-test", "--timeout=120s"}).
+		WithExec([]string{"kubectl", "rollout", "status", "deployment/api-backend", "-n", "k8s-d2-test", "--timeout=120s"}).
+		// Wait for StatefulSet (critical for PVC creation)
+		WithExec([]string{"kubectl", "rollout", "status", "statefulset/database", "-n", "k8s-d2-test", "--timeout=120s"}).
+		// Wait for DaemonSet
+		WithExec([]string{"kubectl", "rollout", "status", "daemonset/log-collector", "-n", "k8s-d2-test", "--timeout=120s"}).
+		Sync(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to wait for workloads to be ready: %w", err)
+	}
+
 	return kindContainer, nil
 }

@@ -100,8 +100,11 @@ func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) (string, e
 	if err := storageValidator.ValidateStorage(); err != nil {
 		return "", fmt.Errorf("storage validation failed: %w", err)
 	}
+	if err := storageValidator.ValidatePVCRelationships(); err != nil {
+		return "", fmt.Errorf("PVC relationship validation failed: %w", err)
+	}
 
-	return "All tests passed! ✓\n- Basic topology validated\n- Storage layer validated\n- D2 syntax correct\n- All resources present", nil
+	return "All tests passed! ✓\n- Basic topology validated\n- Storage layer validated\n- PVC relationships validated\n- D2 syntax correct\n- All resources present", nil
 }
 
 // build compiles k8s-d2 binary
