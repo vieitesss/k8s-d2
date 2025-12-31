@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/icon.png" width="150" alt="k8s-d2">
+</p>
+
 # k8s-d2
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/vieitesss/k8s-d2)](https://goreportcard.com/report/github.com/vieitesss/k8s-d2)
