@@ -42,3 +42,10 @@ spec:
       - name: app
         image: busybox:latest
         command: ['sh', '-c', 'while true; do sleep 3600; done']
+        volumeMounts:
+        - name: logs
+          mountPath: /var/log/app
+      volumes:
+      - name: logs
+        persistentVolumeClaim:
+          claimName: logs-volume

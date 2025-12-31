@@ -101,6 +101,9 @@ func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) (string, e
 	if err := storageValidator.ValidateStorage(); err != nil {
 		return "", fmt.Errorf("storage validation failed: %w", err)
 	}
+	if err := storageValidator.ValidatePVCRelationships(); err != nil {
+		return "", fmt.Errorf("PVC relationship validation failed: %w", err)
+	}
 
 	// Test --quiet flag produces identical output
 	quietOutput, err := m.runK8sD2Quiet(ctx, kindBinFixCtr, false)
