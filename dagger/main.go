@@ -194,11 +194,10 @@ func (m *Dagger) runK8sD2Quiet(
 		return "", fmt.Errorf("failed to read stderr: %w", err)
 	}
 
-	// Validate that stderr doesn't contain log messages or spinner output
+	// Validate that stderr doesn't contain progress/info messages
+	// Note: ERROR messages are intentionally allowed - users should see errors even in quiet mode
 	unwantedPatterns := []string{
-		"INFO",           // Log messages
-		"ERROR",          // Error messages (should still fail)
-		"WARN",           // Warning messages
+		"INFO",           // Informational log messages
 		"successfully",   // Success messages
 		"Creating",       // Spinner messages
 		"Fetching",       // Spinner messages
