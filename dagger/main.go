@@ -9,7 +9,6 @@ import (
 	"context"
 	"dagger/dagger/internal/dagger"
 	"fmt"
-	"strings"
 )
 
 type Dagger struct {
