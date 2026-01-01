@@ -12,6 +12,7 @@ type RootOptions struct {
 	includeStorage bool
 	gridColumns    int
 	showVersion    bool
+	quiet          bool
 }
 
 var rootOptions RootOptions
@@ -34,6 +35,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&rootOptions.includeStorage, "include-storage", false, "include PVC/StorageClass layer")
 	rootCmd.Flags().IntVar(&rootOptions.gridColumns, "grid-columns", 3, "number of columns in grid layout (0 for single column)")
 	rootCmd.Flags().BoolVarP(&rootOptions.showVersion, "version", "v", false, "show version information")
+	rootCmd.Flags().BoolVarP(&rootOptions.quiet, "quiet", "q", false, "suppress progress indicators and log messages")
 }
 
 func Execute(version string) error {
