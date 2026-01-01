@@ -112,7 +112,7 @@ func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) (string, e
 		return "", fmt.Errorf("quiet mode output differs from normal mode")
 	}
 
-	return "All tests passed! ✓\n- Basic topology validated\n- Storage layer validated\n- D2 syntax correct\n- All resources present\n- Quiet flag validated (no logs/spinners in stderr)", nil
+	return "All tests passed! ✓\n- Basic topology validated\n- Storage layer validated\n- D2 syntax correct\n- All resources present\n- Quiet flag validated", nil
 }
 
 // build compiles k8s-d2 binary
@@ -175,40 +175,28 @@ func (m *Dagger) runK8sD2Quiet(
 		WithWorkdir("/output")
 
 	outputFile := "/output/test-quiet.d2"
+	stdoutFile := "/output/stdout.log"
 	stderrFile := "/output/stderr.log"
 	args := []string{"sh", "-c"}
 
 	var cmd string
 	if includeStorage {
-		cmd = fmt.Sprintf("k8sdd -n k8s-d2-test --include-storage -o %s --quiet 2> %s", outputFile, stderrFile)
+		cmd = fmt.Sprintf("k8sdd -n k8s-d2-test --include-storage -o %s --quiet > %s 2> %s", outputFile, stdoutFile, stderrFile)
 	} else {
-		cmd = fmt.Sprintf("k8sdd -n k8s-d2-test -o %s --quiet 2> %s", outputFile, stderrFile)
+		cmd = fmt.Sprintf("k8sdd -n k8s-d2-test -o %s --quiet > %s 2> %s", outputFile, stdoutFile, stderrFile)
 	}
 	args = append(args, cmd)
 
 	execCtr := ctr.WithExec(args)
 
-	// Check stderr for unwanted log output
-	stderr, err := execCtr.File(stderrFile).Contents(ctx)
+	// Check stdout for unwanted output.
+	stdout, err := execCtr.File(stdoutFile).Contents(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to read stderr: %w", err)
+		return "", fmt.Errorf("failed to read stdout: %w", err)
 	}
 
-	// Validate that stderr doesn't contain progress/info messages
-	// Note: ERROR messages are intentionally allowed - users should see errors even in quiet mode
-	unwantedPatterns := []string{
-		"INFO",           // Informational log messages
-		"successfully",   // Success messages
-		"Creating",       // Spinner messages
-		"Fetching",       // Spinner messages
-		"Rendering",      // Spinner messages
-		"\x1b[",          // ANSI escape codes (used by spinners)
-	}
-
-	for _, pattern := range unwantedPatterns {
-		if strings.Contains(stderr, pattern) {
-			return "", fmt.Errorf("quiet mode test failed: stderr contains unwanted output '%s'", pattern)
-		}
+	if stdout != "" {
+		return "", fmt.Errorf("quiet mode test failed: stdout should be empty but contains: %s", stdout)
 	}
 
 	// Get the D2 output

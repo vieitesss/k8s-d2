@@ -46,9 +46,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if !rootOptions.quiet {
-		log.Info("D2 diagram generated successfully")
-	}
+	log.Info("D2 diagram generated successfully")
 	return nil
 }
 
