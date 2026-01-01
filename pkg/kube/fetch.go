@@ -277,9 +277,9 @@ func isSystemNamespace(name string) bool {
 func isSystemConfigMap(name string) bool {
 	// Known system-managed ConfigMaps
 	systemConfigMaps := []string{
-		"kube-root-ca.crt",      // Kubernetes cluster CA certificate (injected in all namespaces)
-		"istio-ca-root-cert",    // Istio service mesh CA certificate
-		"linkerd-config",        // Linkerd service mesh configuration
+		"kube-root-ca.crt",   // Kubernetes cluster CA certificate (injected in all namespaces)
+		"istio-ca-root-cert", // Istio service mesh CA certificate
+		"linkerd-config",     // Linkerd service mesh configuration
 	}
 
 	if slices.Contains(systemConfigMaps, name) {

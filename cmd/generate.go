@@ -15,6 +15,11 @@ import (
 func runGenerate(cmd *cobra.Command, args []string) error {
 	log.SetReportTimestamp(false)
 
+	// Configure logger for quiet mode - suppress INFO but keep WARN/ERROR
+	if rootOptions.quiet {
+		log.SetLevel(log.WarnLevel)
+	}
+
 	client, err := createClientWithSpinner()
 	if err != nil {
 		return err
@@ -41,9 +46,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if !rootOptions.quiet {
-		log.Info("D2 diagram generated successfully")
-	}
+	log.Info("D2 diagram generated successfully")
 	return nil
 }
 

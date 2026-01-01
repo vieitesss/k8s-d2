@@ -38,6 +38,9 @@ go run main.go -o cluster.d2
 # Test specific namespace
 go run main.go -n <namespace> -o test.d2
 
+# Run in silent mode
+go run main.go -n <namespace> --quiet -o silent.d2
+
 # Verify build after changes
 go build -o k8sdd . && ./k8sdd -o /tmp/test.d2
 
