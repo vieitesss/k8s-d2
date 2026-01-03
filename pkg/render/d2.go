@@ -163,6 +163,9 @@ func (r *D2Renderer) writeWorkloadPVCConnections(b *strings.Builder, ns *model.N
 
 	for _, workloads := range workloadGroups {
 		for _, w := range workloads {
+			if len(w.PVCNames) == 0 {
+				continue
+			}
 			workloadID := sanitizeID(w.Name)
 			for _, pvcName := range w.PVCNames {
 				pvcID := sanitizeID(pvcName)
