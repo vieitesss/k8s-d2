@@ -155,9 +155,9 @@ func (r *D2Renderer) writeConnections(b *strings.Builder, ns *model.Namespace, i
 }
 
 func (r *D2Renderer) writeWorkloadPVCConnections(b *strings.Builder, ns *model.Namespace, indent string) {
-	allWorkloads := [][]model.Workload{ns.Deployments, ns.StatefulSets, ns.DaemonSets}
+	workloadGroups := [][]model.Workload{ns.Deployments, ns.StatefulSets, ns.DaemonSets}
 
-	for _, workloads := range allWorkloads {
+	for _, workloads := range workloadGroups {
 		for _, w := range workloads {
 			workloadID := sanitizeID(w.Name)
 			for _, pvcName := range w.PVCNames {
