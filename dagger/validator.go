@@ -139,11 +139,18 @@ func (v *D2Validator) ValidatePVCRelationships() error {
 		}
 	}
 
-	// TODO: Once PVC-to-workload connections are rendered in D2 output,
-	// add validation for connections like:
-	// - pvc_logs_volume -> api_backend
-	// - pvc_data_database_0 -> database
-	// - pvc_data_database_1 -> database
+	// Validate workload-to-PVC connections
+	expectedConnections := []string{
+		"api_backend -> pvc_logs_volume",
+		"database -> pvc_data_database_0",
+		"database -> pvc_data_database_1",
+	}
+
+	for _, conn := range expectedConnections {
+		if !strings.Contains(v.output, conn) {
+			return fmt.Errorf("missing workload-to-PVC connection: %s", conn)
+		}
+	}
 
 	return nil
 }

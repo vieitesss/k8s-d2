@@ -151,6 +151,28 @@ func (r *D2Renderer) writeConnections(b *strings.Builder, ns *model.Namespace, i
 		}
 		r.writeServiceConnections(b, &svc, ns, indent)
 	}
+
+	// Only render workload-to-PVC connections if PVCs are actually present
+	if len(ns.PVCs) > 0 {
+		r.writeWorkloadPVCConnections(b, ns, indent)
+	}
+}
+
+func (r *D2Renderer) writeWorkloadPVCConnections(b *strings.Builder, ns *model.Namespace, indent string) {
+	workloadGroups := [][]model.Workload{ns.Deployments, ns.StatefulSets, ns.DaemonSets}
+
+	for _, workloads := range workloadGroups {
+		for _, w := range workloads {
+			if len(w.PVCNames) == 0 {
+				continue
+			}
+			workloadID := sanitizeID(w.Name)
+			for _, pvcName := range w.PVCNames {
+				pvcID := sanitizeID(pvcName)
+				fmt.Fprintf(b, "%s  %s -> pvc_%s\n", indent, workloadID, pvcID)
+			}
+		}
+	}
 }
 
 func (r *D2Renderer) writeServiceConnections(b *strings.Builder, svc *model.Service, ns *model.Namespace, indent string) {
