@@ -151,6 +151,27 @@ func (r *D2Renderer) writeConnections(b *strings.Builder, ns *model.Namespace, i
 		}
 		r.writeServiceConnections(b, &svc, ns, indent)
 	}
+	r.writeWorkloadPVCConnections(b, ns, indent)
+}
+
+func (r *D2Renderer) writeWorkloadPVCConnections(b *strings.Builder, ns *model.Namespace, indent string) {
+	writeConnections := func(w model.Workload) {
+		workloadID := sanitizeID(w.Name)
+		for _, pvcName := range w.PVCNames {
+			pvcID := sanitizeID(pvcName)
+			fmt.Fprintf(b, "%s  %s -> pvc_%s\n", indent, workloadID, pvcID)
+		}
+	}
+
+	for _, w := range ns.Deployments {
+		writeConnections(w)
+	}
+	for _, w := range ns.StatefulSets {
+		writeConnections(w)
+	}
+	for _, w := range ns.DaemonSets {
+		writeConnections(w)
+	}
 }
 
 func (r *D2Renderer) writeServiceConnections(b *strings.Builder, svc *model.Service, ns *model.Namespace, indent string) {
