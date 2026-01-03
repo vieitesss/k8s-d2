@@ -151,7 +151,11 @@ func (r *D2Renderer) writeConnections(b *strings.Builder, ns *model.Namespace, i
 		}
 		r.writeServiceConnections(b, &svc, ns, indent)
 	}
-	r.writeWorkloadPVCConnections(b, ns, indent)
+
+	// Only render workload-to-PVC connections if PVCs are actually present
+	if len(ns.PVCs) > 0 {
+		r.writeWorkloadPVCConnections(b, ns, indent)
+	}
 }
 
 func (r *D2Renderer) writeWorkloadPVCConnections(b *strings.Builder, ns *model.Namespace, indent string) {
