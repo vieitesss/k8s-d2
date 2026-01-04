@@ -111,7 +111,7 @@ func (m *Dagger) runValidationTests(
 		WithEnvVariable("D2_OUTPUT_BASIC", basicOutput).
 		WithEnvVariable("D2_OUTPUT_STORAGE", storageOutput).
 		WithEnvVariable("D2_OUTPUT_QUIET", quietOutput).
-		WithExec([]string{"go", "test", "-v", "./pkg/validation/..."})
+		WithExec([]string{"go", "test", "-v", "./internal/validation/..."})
 
 	output, err := testCtr.Stdout(ctx)
 	if err != nil {
