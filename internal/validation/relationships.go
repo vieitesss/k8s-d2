@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/vieitesss/k8s-d2/pkg/model"
-	"github.com/vieitesss/k8s-d2/pkg/util"
+	"github.com/vieitesss/k8s-d2/pkg/render"
 )
 
 // Connection represents a relationship between two resources in the D2 diagram
@@ -34,10 +34,10 @@ func (rd *RelationshipDeriver) ServiceToWorkloadConnections(ns *model.Namespace)
 	allWorkloads = append(allWorkloads, ns.DaemonSets...)
 
 	for _, svc := range ns.Services {
-		svcID := util.SanitizeID(svc.Name)
+		svcID := render.SanitizeID(svc.Name)
 		for _, w := range allWorkloads {
-			if util.LabelsMatch(svc.Selector, w.Labels) {
-				wID := util.SanitizeID(w.Name)
+			if render.LabelsMatch(svc.Selector, w.Labels) {
+				wID := render.SanitizeID(w.Name)
 				connections = append(connections, Connection{
 					From: fmt.Sprintf("svc_%s", svcID),
 					To:   wID,
@@ -61,9 +61,9 @@ func (rd *RelationshipDeriver) WorkloadToPVCConnections(ns *model.Namespace) []C
 	allWorkloads = append(allWorkloads, ns.DaemonSets...)
 
 	for _, w := range allWorkloads {
-		wID := util.SanitizeID(w.Name)
+		wID := render.SanitizeID(w.Name)
 		for _, pvcName := range w.PVCNames {
-			pvcID := util.SanitizeID(pvcName)
+			pvcID := render.SanitizeID(pvcName)
 			connections = append(connections, Connection{
 				From: wID,
 				To:   fmt.Sprintf("pvc_%s", pvcID),

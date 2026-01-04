@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/vieitesss/k8s-d2/pkg/validation"
+	"github.com/vieitesss/k8s-d2/internal/validation"
 )
 
 // TestD2Output_BasicFromEnv validates D2 output provided via environment variables

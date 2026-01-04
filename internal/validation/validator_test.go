@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/vieitesss/k8s-d2/internal/validation"
 	"github.com/vieitesss/k8s-d2/pkg/model"
 	"github.com/vieitesss/k8s-d2/pkg/render"
-	"github.com/vieitesss/k8s-d2/pkg/validation"
 )
 
 func TestD2Validator_BasicTopology(t *testing.T) {

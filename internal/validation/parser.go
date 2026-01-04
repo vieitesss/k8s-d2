@@ -3,8 +3,8 @@ package validation
 import (
 	"bytes"
 
+	"github.com/vieitesss/k8s-d2/pkg/kube"
 	"github.com/vieitesss/k8s-d2/pkg/model"
-	"github.com/vieitesss/k8s-d2/pkg/util"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
@@ -111,7 +111,7 @@ func (p *FixtureParser) parseDeployment(doc []byte, ns *model.Namespace) error {
 		Kind:     "Deployment",
 		Replicas: replicas,
 		Labels:   dep.Spec.Selector.MatchLabels,
-		PVCNames: util.ExtractPVCNames(dep.Spec.Template.Spec.Volumes),
+		PVCNames: kube.ExtractPVCNames(dep.Spec.Template.Spec.Volumes),
 	}
 
 	ns.Deployments = append(ns.Deployments, workload)
@@ -131,7 +131,7 @@ func (p *FixtureParser) parseStatefulSet(doc []byte, ns *model.Namespace) error 
 	}
 
 	// Extract PVC names including generated names from volumeClaimTemplates
-	pvcNames := util.ExtractAllStatefulSetPVCNames(
+	pvcNames := kube.ExtractAllStatefulSetPVCNames(
 		ss.Spec.Template.Spec.Volumes,
 		ss.Spec.VolumeClaimTemplates,
 		ss.Name,
@@ -162,7 +162,7 @@ func (p *FixtureParser) parseDaemonSet(doc []byte, ns *model.Namespace) error {
 		Kind:     "DaemonSet",
 		Replicas: 0, // DaemonSets don't have a fixed replica count
 		Labels:   ds.Spec.Selector.MatchLabels,
-		PVCNames: util.ExtractPVCNames(ds.Spec.Template.Spec.Volumes),
+		PVCNames: kube.ExtractPVCNames(ds.Spec.Template.Spec.Volumes),
 	}
 
 	ns.DaemonSets = append(ns.DaemonSets, workload)

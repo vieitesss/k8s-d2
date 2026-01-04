@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/vieitesss/k8s-d2/pkg/model"
-	"github.com/vieitesss/k8s-d2/pkg/util"
+	"github.com/vieitesss/k8s-d2/pkg/render"
 )
 
 // D2Validator validates D2 diagram output against expected topology
@@ -43,7 +43,7 @@ func (v *D2Validator) ValidateSyntax() error {
 func (v *D2Validator) ValidateResources() error {
 	for _, ns := range v.expected.Namespaces {
 		// Check namespace container
-		nsID := util.SanitizeID(ns.Name)
+		nsID := render.SanitizeID(ns.Name)
 		if !strings.Contains(v.actual, nsID) {
 			return fmt.Errorf("missing namespace: %s", ns.Name)
 		}
@@ -55,7 +55,7 @@ func (v *D2Validator) ValidateResources() error {
 		allWorkloads = append(allWorkloads, ns.DaemonSets...)
 
 		for _, w := range allWorkloads {
-			wID := util.SanitizeID(w.Name)
+			wID := render.SanitizeID(w.Name)
 			if !strings.Contains(v.actual, wID) {
 				return fmt.Errorf("missing workload: %s (%s)", w.Name, w.Kind)
 			}
@@ -63,7 +63,7 @@ func (v *D2Validator) ValidateResources() error {
 
 		// Check services
 		for _, svc := range ns.Services {
-			svcID := "svc_" + util.SanitizeID(svc.Name)
+			svcID := "svc_" + render.SanitizeID(svc.Name)
 			if !strings.Contains(v.actual, svcID) {
 				return fmt.Errorf("missing service: %s", svc.Name)
 			}
@@ -71,7 +71,7 @@ func (v *D2Validator) ValidateResources() error {
 
 		// Check PVCs
 		for _, pvc := range ns.PVCs {
-			pvcID := "pvc_" + util.SanitizeID(pvc.Name)
+			pvcID := "pvc_" + render.SanitizeID(pvc.Name)
 			if !strings.Contains(v.actual, pvcID) {
 				return fmt.Errorf("missing PVC: %s", pvc.Name)
 			}
@@ -97,7 +97,7 @@ func (v *D2Validator) ValidateWorkloadLabels() error {
 		workloadsWithReplicas = append(workloadsWithReplicas, ns.StatefulSets...)
 
 		for _, w := range workloadsWithReplicas {
-			icon := util.WorkloadIcon(w.Kind)
+			icon := render.WorkloadIcon(w.Kind)
 			expectedLabel := fmt.Sprintf("%s %s (%d)", icon, w.Name, w.Replicas)
 			if !strings.Contains(v.actual, expectedLabel) {
 				return fmt.Errorf("incorrect label for %s (expected: %s)", w.Name, expectedLabel)
@@ -106,7 +106,7 @@ func (v *D2Validator) ValidateWorkloadLabels() error {
 
 		// DaemonSets don't show replica count
 		for _, w := range ns.DaemonSets {
-			icon := util.WorkloadIcon(w.Kind)
+			icon := render.WorkloadIcon(w.Kind)
 			expectedLabel := fmt.Sprintf("%s %s", icon, w.Name)
 			if !strings.Contains(v.actual, expectedLabel) {
 				return fmt.Errorf("incorrect label for %s (expected: %s)", w.Name, expectedLabel)
