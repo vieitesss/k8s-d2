@@ -30,5 +30,5 @@ generate *parameters:
 	open {{outputImage}}
 
 [working-directory: "dagger"]
-test_local:
-	dagger call run --docker-socket /var/run/docker.sock --kind-svc tcp://localhost:61254 --kubeconfig file://~/.kube
+test_local port:
+	dagger call run --docker-socket /var/run/docker.sock --kind-svc tcp://localhost:{{port}} --kubeconfig file://~/.kube
