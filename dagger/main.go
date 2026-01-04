@@ -91,7 +91,7 @@ func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) (string, e
 	return fmt.Sprintf("All tests passed! ✓\n- Basic topology validated\n- Storage layer validated\n- D2 syntax correct\n- All resources present\n- Quiet flag validated\n\nTest output:\n%s", testOutput), nil
 }
 
-func (m *Dagger) Base() *dagger.Container {
+func (m *Dagger) BaseContainer() *dagger.Container {
 	return dag.Container().
 		From("golang:1.24").
 		WithDirectory("/src", m.Src).
@@ -107,7 +107,7 @@ func (m *Dagger) runValidationTests(
 	storageOutput string,
 	quietOutput string,
 ) (string, error) {
-	testCtr := m.Base().
+	testCtr := m.BaseContainer().
 		WithEnvVariable("D2_OUTPUT_BASIC", basicOutput).
 		WithEnvVariable("D2_OUTPUT_STORAGE", storageOutput).
 		WithEnvVariable("D2_OUTPUT_QUIET", quietOutput).
@@ -123,7 +123,7 @@ func (m *Dagger) runValidationTests(
 
 // build compiles k8s-d2 binary
 func (m *Dagger) build(ctr *dagger.Container) *dagger.Container {
-	binary := m.Base().
+	binary := m.BaseContainer().
 		WithEnvVariable("CGO_ENABLED", "0").
 		WithExec([]string{"go", "build", "-o", "k8sdd", "."}).
 		File("/src/k8sdd")
