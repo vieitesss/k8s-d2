@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/vieitesss/k8s-d2/pkg/model"
+	"github.com/vieitesss/k8s-d2/pkg/util"
 )
 
 type D2Renderer struct {
@@ -61,7 +62,7 @@ direction: right
 }
 
 func (r *D2Renderer) renderNamespaceIndented(ns *model.Namespace, indent string) error {
-	nsID := sanitizeID(ns.Name)
+	nsID := util.SanitizeID(ns.Name)
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "%s%s: {\n", indent, nsID)
@@ -111,7 +112,7 @@ func (r *D2Renderer) writeConfigInfo(b *strings.Builder, ns *model.Namespace, in
 
 func (r *D2Renderer) writePVCs(b *strings.Builder, ns *model.Namespace, indent string) {
 	for _, pvc := range ns.PVCs {
-		pvcID := sanitizeID(pvc.Name)
+		pvcID := util.SanitizeID(pvc.Name)
 		label := fmt.Sprintf("💾 %s", pvc.Name)
 		if pvc.Capacity != "" {
 			label = fmt.Sprintf("%s\\n%s", label, pvc.Capacity)
@@ -127,8 +128,8 @@ func (r *D2Renderer) writePVCs(b *strings.Builder, ns *model.Namespace, indent s
 }
 
 func (r *D2Renderer) writeWorkload(b *strings.Builder, w *model.Workload, indent string) {
-	wID := sanitizeID(w.Name)
-	icon := workloadIcon(w.Kind)
+	wID := util.SanitizeID(w.Name)
+	icon := util.WorkloadIcon(w.Kind)
 
 	fmt.Fprintf(b, "%s  %s: {\n", indent, wID)
 	fmt.Fprintf(b, "%s    label: \"%s %s (%d)\"\n", indent, icon, w.Name, w.Replicas)
@@ -136,7 +137,7 @@ func (r *D2Renderer) writeWorkload(b *strings.Builder, w *model.Workload, indent
 }
 
 func (r *D2Renderer) writeService(b *strings.Builder, svc *model.Service, indent string) {
-	svcID := sanitizeID(svc.Name)
+	svcID := util.SanitizeID(svc.Name)
 
 	fmt.Fprintf(b, "%s  svc_%s: {\n", indent, svcID)
 	fmt.Fprintf(b, "%s    label: \"⎈ %s\\n%s\"\n", indent, svc.Name, svc.Type)
@@ -151,47 +152,41 @@ func (r *D2Renderer) writeConnections(b *strings.Builder, ns *model.Namespace, i
 		}
 		r.writeServiceConnections(b, &svc, ns, indent)
 	}
+
+	// Only render workload-to-PVC connections if PVCs are actually present
+	if len(ns.PVCs) > 0 {
+		r.writeWorkloadPVCConnections(b, ns, indent)
+	}
 }
 
-func (r *D2Renderer) writeServiceConnections(b *strings.Builder, svc *model.Service, ns *model.Namespace, indent string) {
-	svcID := sanitizeID(svc.Name)
-	allWorkloads := [][]model.Workload{ns.Deployments, ns.StatefulSets, ns.DaemonSets}
+func (r *D2Renderer) writeWorkloadPVCConnections(b *strings.Builder, ns *model.Namespace, indent string) {
+	workloadGroups := [][]model.Workload{ns.Deployments, ns.StatefulSets, ns.DaemonSets}
 
-	for _, workloads := range allWorkloads {
+	for _, workloads := range workloadGroups {
 		for _, w := range workloads {
-			if labelsMatch(svc.Selector, w.Labels) {
-				wID := sanitizeID(w.Name)
-				fmt.Fprintf(b, "%s  svc_%s -> %s\n", indent, svcID, wID)
+			if len(w.PVCNames) == 0 {
+				continue
+			}
+			workloadID := util.SanitizeID(w.Name)
+			for _, pvcName := range w.PVCNames {
+				pvcID := util.SanitizeID(pvcName)
+				fmt.Fprintf(b, "%s  %s -> pvc_%s\n", indent, workloadID, pvcID)
 			}
 		}
 	}
 }
 
-func labelsMatch(selector, labels map[string]string) bool {
-	if len(selector) == 0 {
-		return false
-	}
+func (r *D2Renderer) writeServiceConnections(b *strings.Builder, svc *model.Service, ns *model.Namespace, indent string) {
+	svcID := util.SanitizeID(svc.Name)
+	allWorkloads := [][]model.Workload{ns.Deployments, ns.StatefulSets, ns.DaemonSets}
 
-	for key, value := range selector {
-		if labels[key] != value {
-			return false
+	for _, workloads := range allWorkloads {
+		for _, w := range workloads {
+			if util.LabelsMatch(svc.Selector, w.Labels) {
+				wID := util.SanitizeID(w.Name)
+				fmt.Fprintf(b, "%s  svc_%s -> %s\n", indent, svcID, wID)
+			}
 		}
-	}
-	return true
-}
-
-func sanitizeID(s string) string {
-	return strings.ReplaceAll(s, "-", "_")
-}
-
-func workloadIcon(kind string) string {
-	switch kind {
-	case "StatefulSet":
-		return "◉"
-	case "DaemonSet":
-		return "◈"
-	default:
-		return "●"
 	}
 }
 

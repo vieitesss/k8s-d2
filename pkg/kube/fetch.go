@@ -2,11 +2,11 @@ package kube
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/vieitesss/k8s-d2/pkg/model"
+	"github.com/vieitesss/k8s-d2/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -87,35 +87,6 @@ func (c *Client) fetchNamespace(ctx context.Context, nsName string, opts FetchOp
 	return ns, nil
 }
 
-// extractPVCNames extracts PVC names from a pod's volumes slice.
-func extractPVCNames(volumes []corev1.Volume) []string {
-	var pvcNames []string
-	for _, vol := range volumes {
-		if vol.PersistentVolumeClaim != nil && vol.PersistentVolumeClaim.ClaimName != "" {
-			pvcNames = append(pvcNames, vol.PersistentVolumeClaim.ClaimName)
-		}
-	}
-	return pvcNames
-}
-
-// extractAllStatefulSetPVCNames extracts all PVC names from a StatefulSet, including
-// both regular pod volumes and generated names from volumeClaimTemplates.
-func extractAllStatefulSetPVCNames(volumes []corev1.Volume, templates []corev1.PersistentVolumeClaim, ssName string, replicas int32) []string {
-	// Start with regular pod volumes
-	pvcNames := extractPVCNames(volumes)
-
-	// Add generated names from volumeClaimTemplates
-	// StatefulSet creates PVCs with pattern: <templateName>-<statefulsetName>-<ordinal>
-	for _, vct := range templates {
-		for i := int32(0); i < replicas; i++ {
-			pvcName := fmt.Sprintf("%s-%s-%d", vct.Name, ssName, i)
-			pvcNames = append(pvcNames, pvcName)
-		}
-	}
-
-	return pvcNames
-}
-
 func (c *Client) fetchDeployments(ctx context.Context, nsName string, ns *model.Namespace) error {
 	deps, err := c.clientset.AppsV1().Deployments(nsName).List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -127,7 +98,7 @@ func (c *Client) fetchDeployments(ctx context.Context, nsName string, ns *model.
 			Kind:     "Deployment",
 			Replicas: *d.Spec.Replicas,
 			Labels:   d.Spec.Selector.MatchLabels,
-			PVCNames: extractPVCNames(d.Spec.Template.Spec.Volumes),
+			PVCNames: util.ExtractPVCNames(d.Spec.Template.Spec.Volumes),
 		})
 	}
 	return nil
@@ -150,7 +121,7 @@ func (c *Client) fetchStatefulSets(ctx context.Context, nsName string, ns *model
 			Kind:     "StatefulSet",
 			Replicas: replicas,
 			Labels:   ss.Spec.Selector.MatchLabels,
-			PVCNames: extractAllStatefulSetPVCNames(
+			PVCNames: util.ExtractAllStatefulSetPVCNames(
 				ss.Spec.Template.Spec.Volumes,
 				ss.Spec.VolumeClaimTemplates,
 				ss.Name,
@@ -172,7 +143,7 @@ func (c *Client) fetchDaemonSets(ctx context.Context, nsName string, ns *model.N
 			Kind:     "DaemonSet",
 			Replicas: ds.Status.DesiredNumberScheduled,
 			Labels:   ds.Spec.Selector.MatchLabels,
-			PVCNames: extractPVCNames(ds.Spec.Template.Spec.Volumes),
+			PVCNames: util.ExtractPVCNames(ds.Spec.Template.Spec.Volumes),
 		})
 	}
 	return nil
