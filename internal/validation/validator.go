@@ -24,7 +24,9 @@ func NewD2Validator(expected *model.Cluster, d2Output string) *D2Validator {
 	}
 }
 
-// ValidateSyntax checks that the D2 output has valid syntax
+// ValidateSyntax checks that the D2 output has valid syntax.
+// Only validates braces and direction header since the rendering logic is deterministic
+// and content validation is handled by other validators (resources, connections, etc.)
 func (v *D2Validator) ValidateSyntax() error {
 	openBraces := strings.Count(v.actual, "{")
 	closeBraces := strings.Count(v.actual, "}")
