@@ -3,6 +3,8 @@ outputImage := "cluster.svg"
 
 alias b := build
 alias g := generate
+alias tl := test_local
+
 
 _default:
 	just --list
@@ -26,3 +28,7 @@ generate *parameters:
 	just run {{parameters}} -o {{outputFile}}
 	d2 {{outputFile}} {{outputImage}}
 	open {{outputImage}}
+
+[working-directory: "dagger"]
+test_local port:
+	dagger call run --docker-socket /var/run/docker.sock --kind-svc tcp://localhost:{{port}} --kubeconfig file://~/.kube

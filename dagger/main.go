@@ -66,23 +66,10 @@ func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) (string, e
 		return "", fmt.Errorf("failed to apply fixtures: %w", err)
 	}
 
+	// Generate D2 outputs from real cluster
 	basicOutput, err := m.runK8sD2(ctx, kindBinFixCtr, false)
 	if err != nil {
 		return "", fmt.Errorf("k8s-d2 execution failed (basic): %w", err)
-	}
-
-	basicValidator := NewD2Validator(basicOutput)
-	if err := basicValidator.ValidateSyntax(); err != nil {
-		return "", fmt.Errorf("syntax validation failed (basic): %w", err)
-	}
-	if err := basicValidator.ValidateBasicTopology(); err != nil {
-		return "", fmt.Errorf("topology validation failed (basic): %w", err)
-	}
-	if err := basicValidator.ValidateLabels(); err != nil {
-		return "", fmt.Errorf("label validation failed (basic): %w", err)
-	}
-	if err := basicValidator.ValidateConnections(); err != nil {
-		return "", fmt.Errorf("connection validation failed (basic): %w", err)
 	}
 
 	storageOutput, err := m.runK8sD2(ctx, kindBinFixCtr, true)
@@ -90,41 +77,53 @@ func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) (string, e
 		return "", fmt.Errorf("k8s-d2 execution failed (storage): %w", err)
 	}
 
-	storageValidator := NewD2Validator(storageOutput)
-	if err := storageValidator.ValidateSyntax(); err != nil {
-		return "", fmt.Errorf("syntax validation failed (storage): %w", err)
-	}
-	if err := storageValidator.ValidateBasicTopology(); err != nil {
-		return "", fmt.Errorf("topology validation failed (storage): %w", err)
-	}
-	if err := storageValidator.ValidateStorage(); err != nil {
-		return "", fmt.Errorf("storage validation failed: %w", err)
-	}
-	if err := storageValidator.ValidatePVCRelationships(); err != nil {
-		return "", fmt.Errorf("PVC relationship validation failed: %w", err)
-	}
-
-	// Test --quiet flag produces identical output
 	quietOutput, err := m.runK8sD2Quiet(ctx, kindBinFixCtr, false)
 	if err != nil {
 		return "", fmt.Errorf("k8s-d2 execution failed (quiet mode): %w", err)
 	}
 
-	if basicOutput != quietOutput {
-		return "", fmt.Errorf("quiet mode output differs from normal mode")
+	// Run Go tests to validate the D2 outputs
+	testOutput, err := m.runValidationTests(ctx, basicOutput, storageOutput, quietOutput)
+	if err != nil {
+		return "", fmt.Errorf("validation tests failed: %w", err)
 	}
 
-	return "All tests passed! ✓\n- Basic topology validated\n- Storage layer validated\n- D2 syntax correct\n- All resources present\n- Quiet flag validated", nil
+	return fmt.Sprintf("All tests passed! ✓\n- Basic topology validated\n- Storage layer validated\n- D2 syntax correct\n- All resources present\n- Quiet flag validated\n\nTest output:\n%s", testOutput), nil
 }
 
-// build compiles k8s-d2 binary
-func (m *Dagger) build(ctr *dagger.Container) *dagger.Container {
-	binary := dag.Container().
+func (m *Dagger) BaseContainer() *dagger.Container {
+	return dag.Container().
 		From("golang:1.24").
 		WithDirectory("/src", m.Src).
 		WithWorkdir("/src").
 		WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod")).
-		WithMountedCache("/root/.cache/go-build", dag.CacheVolume("go-build")).
+		WithMountedCache("/root/.cache/go-build", dag.CacheVolume("go-build"))
+}
+
+// runValidationTests runs Go tests to validate D2 outputs
+func (m *Dagger) runValidationTests(
+	ctx context.Context,
+	basicOutput string,
+	storageOutput string,
+	quietOutput string,
+) (string, error) {
+	testCtr := m.BaseContainer().
+		WithEnvVariable("D2_OUTPUT_BASIC", basicOutput).
+		WithEnvVariable("D2_OUTPUT_STORAGE", storageOutput).
+		WithEnvVariable("D2_OUTPUT_QUIET", quietOutput).
+		WithExec([]string{"go", "test", "-v", "./internal/validation/..."})
+
+	output, err := testCtr.Stdout(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return output, nil
+}
+
+// build compiles k8s-d2 binary
+func (m *Dagger) build(ctr *dagger.Container) *dagger.Container {
+	binary := m.BaseContainer().
 		WithEnvVariable("CGO_ENABLED", "0").
 		WithExec([]string{"go", "build", "-o", "k8sdd", "."}).
 		File("/src/k8sdd")
