@@ -2,7 +2,6 @@ package validation
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/vieitesss/k8s-d2/pkg/model"
 	"github.com/vieitesss/k8s-d2/pkg/render"
@@ -52,19 +51,6 @@ func (rd *RelationshipDeriver) ServiceToWorkloadConnections(ns *model.Namespace)
 	return connections
 }
 
-// formatMountLabel creates mount label for validation matching.
-func formatMountLabel(mounts []model.VolumeMount) string {
-	labels := make([]string, len(mounts))
-	for i, m := range mounts {
-		accessMode := "rw"
-		if m.ReadOnly {
-			accessMode = "ro"
-		}
-		labels[i] = fmt.Sprintf("%s (%s)", m.MountPath, accessMode)
-	}
-	return strings.Join(labels, "\\n")
-}
-
 // WorkloadToPVCConnections derives all workload→PVC connections in a namespace
 func (rd *RelationshipDeriver) WorkloadToPVCConnections(ns *model.Namespace) []Connection {
 	var connections []Connection
@@ -90,7 +76,7 @@ func (rd *RelationshipDeriver) WorkloadToPVCConnections(ns *model.Namespace) []C
 				From:  wID,
 				To:    fmt.Sprintf("pvc_%s", pvcID),
 				Type:  "workload-to-pvc",
-				Label: formatMountLabel(mounts),
+				Label: model.FormatMountLabel(mounts),
 			})
 		}
 	}

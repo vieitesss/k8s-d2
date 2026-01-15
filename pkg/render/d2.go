@@ -158,22 +158,6 @@ func (r *D2Renderer) writeConnections(b *strings.Builder, ns *model.Namespace, i
 	}
 }
 
-// formatMountLabel creates a compact label for volume mounts.
-// Single mount: "/var/log/app (rw)"
-// Multiple mounts: "/data (rw)\\n/backup (ro)"
-// Note: Uses \\n for D2 newlines in labels.
-func formatMountLabel(mounts []model.VolumeMount) string {
-	labels := make([]string, len(mounts))
-	for i, m := range mounts {
-		accessMode := "rw"
-		if m.ReadOnly {
-			accessMode = "ro"
-		}
-		labels[i] = fmt.Sprintf("%s (%s)", m.MountPath, accessMode)
-	}
-	return strings.Join(labels, "\\n")
-}
-
 func (r *D2Renderer) writeWorkloadPVCConnections(b *strings.Builder, ns *model.Namespace, indent string) {
 	workloadGroups := [][]model.Workload{ns.Deployments, ns.StatefulSets, ns.DaemonSets}
 
@@ -193,7 +177,7 @@ func (r *D2Renderer) writeWorkloadPVCConnections(b *strings.Builder, ns *model.N
 
 			for pvcName, mounts := range mountsByPVC {
 				pvcID := SanitizeID(pvcName)
-				label := formatMountLabel(mounts)
+				label := model.FormatMountLabel(mounts)
 				fmt.Fprintf(b, "%s  %s -> pvc_%s: \"%s\"\n", indent, workloadID, pvcID, label)
 			}
 		}
