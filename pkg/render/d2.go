@@ -158,18 +158,43 @@ func (r *D2Renderer) writeConnections(b *strings.Builder, ns *model.Namespace, i
 	}
 }
 
+// formatMountLabel creates a compact label for volume mounts.
+// Single mount: "/var/log/app (rw)"
+// Multiple mounts: "/data (rw)\\n/backup (ro)"
+// Note: Uses \\n for D2 newlines in labels.
+func formatMountLabel(mounts []model.VolumeMount) string {
+	labels := make([]string, len(mounts))
+	for i, m := range mounts {
+		accessMode := "rw"
+		if m.ReadOnly {
+			accessMode = "ro"
+		}
+		labels[i] = fmt.Sprintf("%s (%s)", m.MountPath, accessMode)
+	}
+	return strings.Join(labels, "\\n")
+}
+
 func (r *D2Renderer) writeWorkloadPVCConnections(b *strings.Builder, ns *model.Namespace, indent string) {
 	workloadGroups := [][]model.Workload{ns.Deployments, ns.StatefulSets, ns.DaemonSets}
 
 	for _, workloads := range workloadGroups {
 		for _, w := range workloads {
-			if len(w.PVCNames) == 0 {
+			if len(w.VolumeMounts) == 0 {
 				continue
 			}
+
 			workloadID := SanitizeID(w.Name)
-			for _, pvcName := range w.PVCNames {
+
+			// Group mounts by PVC (handle case where same PVC mounted at multiple paths)
+			mountsByPVC := make(map[string][]model.VolumeMount)
+			for _, mount := range w.VolumeMounts {
+				mountsByPVC[mount.PVCName] = append(mountsByPVC[mount.PVCName], mount)
+			}
+
+			for pvcName, mounts := range mountsByPVC {
 				pvcID := SanitizeID(pvcName)
-				fmt.Fprintf(b, "%s  %s -> pvc_%s\n", indent, workloadID, pvcID)
+				label := formatMountLabel(mounts)
+				fmt.Fprintf(b, "%s  %s -> pvc_%s: \"%s\"\n", indent, workloadID, pvcID, label)
 			}
 		}
 	}
