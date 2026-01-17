@@ -9,9 +9,10 @@ import (
 
 // Connection represents a relationship between two resources in the D2 diagram
 type Connection struct {
-	From string // Source resource ID (e.g., "svc_web_service")
-	To   string // Target resource ID (e.g., "web_frontend")
-	Type string // Connection type: "service-to-workload" or "workload-to-pvc"
+	From  string // Source resource ID (e.g., "svc_web_service")
+	To    string // Target resource ID (e.g., "web_frontend")
+	Type  string // Connection type: "service-to-workload" or "workload-to-pvc"
+	Label string // Connection label for mount metadata (e.g., "/var/log (rw)")
 }
 
 // RelationshipDeriver handles deriving connections between resources.
@@ -62,12 +63,20 @@ func (rd *RelationshipDeriver) WorkloadToPVCConnections(ns *model.Namespace) []C
 
 	for _, w := range allWorkloads {
 		wID := render.SanitizeID(w.Name)
-		for _, pvcName := range w.PVCNames {
+
+		// Group by PVC name (handle same PVC mounted at multiple paths)
+		mountsByPVC := make(map[string][]model.VolumeMount)
+		for _, mount := range w.VolumeMounts {
+			mountsByPVC[mount.PVCName] = append(mountsByPVC[mount.PVCName], mount)
+		}
+
+		for pvcName, mounts := range mountsByPVC {
 			pvcID := render.SanitizeID(pvcName)
 			connections = append(connections, Connection{
-				From: wID,
-				To:   fmt.Sprintf("pvc_%s", pvcID),
-				Type: "workload-to-pvc",
+				From:  wID,
+				To:    fmt.Sprintf("pvc_%s", pvcID),
+				Type:  "workload-to-pvc",
+				Label: model.FormatMountLabel(mounts),
 			})
 		}
 	}

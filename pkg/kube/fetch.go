@@ -93,12 +93,16 @@ func (c *Client) fetchDeployments(ctx context.Context, nsName string, ns *model.
 		return err
 	}
 	for _, d := range deps.Items {
+		volumeMounts := ExtractVolumeMounts(
+			d.Spec.Template.Spec.Containers,
+			d.Spec.Template.Spec.Volumes,
+		)
 		ns.Deployments = append(ns.Deployments, model.Workload{
-			Name:     d.Name,
-			Kind:     "Deployment",
-			Replicas: *d.Spec.Replicas,
-			Labels:   d.Spec.Selector.MatchLabels,
-			PVCNames: ExtractPVCNames(d.Spec.Template.Spec.Volumes),
+			Name:         d.Name,
+			Kind:         "Deployment",
+			Replicas:     *d.Spec.Replicas,
+			Labels:       d.Spec.Selector.MatchLabels,
+			VolumeMounts: volumeMounts,
 		})
 	}
 	return nil
@@ -116,17 +120,19 @@ func (c *Client) fetchStatefulSets(ctx context.Context, nsName string, ns *model
 			replicas = *ss.Spec.Replicas
 		}
 
+		volumeMounts := ExtractAllStatefulSetVolumeMounts(
+			ss.Spec.Template.Spec.Containers,
+			ss.Spec.Template.Spec.Volumes,
+			ss.Spec.VolumeClaimTemplates,
+			ss.Name,
+			replicas,
+		)
 		ns.StatefulSets = append(ns.StatefulSets, model.Workload{
-			Name:     ss.Name,
-			Kind:     "StatefulSet",
-			Replicas: replicas,
-			Labels:   ss.Spec.Selector.MatchLabels,
-			PVCNames: ExtractAllStatefulSetPVCNames(
-				ss.Spec.Template.Spec.Volumes,
-				ss.Spec.VolumeClaimTemplates,
-				ss.Name,
-				replicas,
-			),
+			Name:         ss.Name,
+			Kind:         "StatefulSet",
+			Replicas:     replicas,
+			Labels:       ss.Spec.Selector.MatchLabels,
+			VolumeMounts: volumeMounts,
 		})
 	}
 	return nil
@@ -138,12 +144,16 @@ func (c *Client) fetchDaemonSets(ctx context.Context, nsName string, ns *model.N
 		return err
 	}
 	for _, ds := range dsets.Items {
+		volumeMounts := ExtractVolumeMounts(
+			ds.Spec.Template.Spec.Containers,
+			ds.Spec.Template.Spec.Volumes,
+		)
 		ns.DaemonSets = append(ns.DaemonSets, model.Workload{
-			Name:     ds.Name,
-			Kind:     "DaemonSet",
-			Replicas: ds.Status.DesiredNumberScheduled,
-			Labels:   ds.Spec.Selector.MatchLabels,
-			PVCNames: ExtractPVCNames(ds.Spec.Template.Spec.Volumes),
+			Name:         ds.Name,
+			Kind:         "DaemonSet",
+			Replicas:     ds.Status.DesiredNumberScheduled,
+			Labels:       ds.Spec.Selector.MatchLabels,
+			VolumeMounts: volumeMounts,
 		})
 	}
 	return nil
@@ -312,4 +322,87 @@ func ExtractAllStatefulSetPVCNames(volumes []corev1.Volume, templates []corev1.P
 	}
 
 	return pvcNames
+}
+
+// ExtractVolumeMounts extracts volume mounts from containers and correlates
+// them with PVC volumes to build VolumeMount objects with mount metadata.
+func ExtractVolumeMounts(
+	containers []corev1.Container,
+	volumes []corev1.Volume,
+) []model.VolumeMount {
+	// Build map: volume name → PVC claim name
+	volumeToPVC := make(map[string]string)
+	for _, vol := range volumes {
+		if vol.PersistentVolumeClaim != nil {
+			volumeToPVC[vol.Name] = vol.PersistentVolumeClaim.ClaimName
+		}
+	}
+
+	// Extract mounts from all containers
+	var mounts []model.VolumeMount
+	for _, container := range containers {
+		for _, vm := range container.VolumeMounts {
+			// Only include mounts that reference PVC volumes
+			if pvcName, ok := volumeToPVC[vm.Name]; ok {
+				mounts = append(mounts, model.VolumeMount{
+					PVCName:   pvcName,
+					MountPath: vm.MountPath,
+					ReadOnly:  vm.ReadOnly,
+				})
+			}
+		}
+	}
+
+	return mounts
+}
+
+// ExtractAllStatefulSetVolumeMounts handles both regular volumes and
+// volumeClaimTemplates for StatefulSets, generating VolumeMount entries
+// for each replica's PVC.
+func ExtractAllStatefulSetVolumeMounts(
+	containers []corev1.Container,
+	volumes []corev1.Volume,
+	templates []corev1.PersistentVolumeClaim,
+	ssName string,
+	replicas int32,
+) []model.VolumeMount {
+	// Start with regular volume mounts
+	mounts := ExtractVolumeMounts(containers, volumes)
+
+	// Build map: template name → mount metadata from containers
+	templateMounts := make(map[string][]model.VolumeMount)
+	for _, container := range containers {
+		for _, vm := range container.VolumeMounts {
+			// Check if this mount references a volumeClaimTemplate
+			for _, vct := range templates {
+				if vm.Name == vct.Name {
+					templateMounts[vct.Name] = append(
+						templateMounts[vct.Name],
+						model.VolumeMount{
+							MountPath: vm.MountPath,
+							ReadOnly:  vm.ReadOnly,
+						},
+					)
+				}
+			}
+		}
+	}
+
+	// Generate mounts for each replica's generated PVC
+	// Pattern: <templateName>-<statefulsetName>-<ordinal>
+	for _, vct := range templates {
+		mountTemplates := templateMounts[vct.Name]
+		for i := range replicas {
+			pvcName := fmt.Sprintf("%s-%s-%d", vct.Name, ssName, i)
+			for _, mt := range mountTemplates {
+				mounts = append(mounts, model.VolumeMount{
+					PVCName:   pvcName,
+					MountPath: mt.MountPath,
+					ReadOnly:  mt.ReadOnly,
+				})
+			}
+		}
+	}
+
+	return mounts
 }

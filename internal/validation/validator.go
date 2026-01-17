@@ -135,7 +135,7 @@ func (v *D2Validator) ValidateServiceConnections() error {
 	return nil
 }
 
-// ValidatePVCConnections checks that workload-to-PVC connections exist
+// ValidatePVCConnections checks that workload-to-PVC connections exist with mount metadata
 func (v *D2Validator) ValidatePVCConnections() error {
 	for _, ns := range v.expected.Namespaces {
 		// Only validate if there are PVCs
@@ -146,9 +146,22 @@ func (v *D2Validator) ValidatePVCConnections() error {
 		connections := v.deriver.WorkloadToPVCConnections(&ns)
 
 		for _, conn := range connections {
-			connectionStr := fmt.Sprintf("%s -> %s", conn.From, conn.To)
-			if !strings.Contains(v.actual, connectionStr) {
-				return fmt.Errorf("missing workload-to-PVC connection: %s", connectionStr)
+			// Check basic connection exists
+			baseConnectionStr := fmt.Sprintf("%s -> %s", conn.From, conn.To)
+			if !strings.Contains(v.actual, baseConnectionStr) {
+				return fmt.Errorf("missing workload-to-PVC connection: %s", baseConnectionStr)
+			}
+
+			// If connection has mount metadata, validate the label appears
+			if conn.Label != "" {
+				fullConnectionStr := fmt.Sprintf("%s: \"%s\"", baseConnectionStr, conn.Label)
+				if !strings.Contains(v.actual, fullConnectionStr) {
+					return fmt.Errorf(
+						"connection %s missing expected mount metadata: %s",
+						baseConnectionStr,
+						conn.Label,
+					)
+				}
 			}
 		}
 	}

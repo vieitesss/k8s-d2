@@ -106,12 +106,17 @@ func (p *FixtureParser) parseDeployment(doc []byte, ns *model.Namespace) error {
 		replicas = *dep.Spec.Replicas
 	}
 
+	volumeMounts := kube.ExtractVolumeMounts(
+		dep.Spec.Template.Spec.Containers,
+		dep.Spec.Template.Spec.Volumes,
+	)
+
 	workload := model.Workload{
-		Name:     dep.Name,
-		Kind:     "Deployment",
-		Replicas: replicas,
-		Labels:   dep.Spec.Selector.MatchLabels,
-		PVCNames: kube.ExtractPVCNames(dep.Spec.Template.Spec.Volumes),
+		Name:         dep.Name,
+		Kind:         "Deployment",
+		Replicas:     replicas,
+		Labels:       dep.Spec.Selector.MatchLabels,
+		VolumeMounts: volumeMounts,
 	}
 
 	ns.Deployments = append(ns.Deployments, workload)
@@ -130,8 +135,9 @@ func (p *FixtureParser) parseStatefulSet(doc []byte, ns *model.Namespace) error 
 		replicas = *ss.Spec.Replicas
 	}
 
-	// Extract PVC names including generated names from volumeClaimTemplates
-	pvcNames := kube.ExtractAllStatefulSetPVCNames(
+	// Extract volume mounts including generated names from volumeClaimTemplates
+	volumeMounts := kube.ExtractAllStatefulSetVolumeMounts(
+		ss.Spec.Template.Spec.Containers,
 		ss.Spec.Template.Spec.Volumes,
 		ss.Spec.VolumeClaimTemplates,
 		ss.Name,
@@ -139,11 +145,11 @@ func (p *FixtureParser) parseStatefulSet(doc []byte, ns *model.Namespace) error 
 	)
 
 	workload := model.Workload{
-		Name:     ss.Name,
-		Kind:     "StatefulSet",
-		Replicas: replicas,
-		Labels:   ss.Spec.Selector.MatchLabels,
-		PVCNames: pvcNames,
+		Name:         ss.Name,
+		Kind:         "StatefulSet",
+		Replicas:     replicas,
+		Labels:       ss.Spec.Selector.MatchLabels,
+		VolumeMounts: volumeMounts,
 	}
 
 	ns.StatefulSets = append(ns.StatefulSets, workload)
@@ -157,12 +163,17 @@ func (p *FixtureParser) parseDaemonSet(doc []byte, ns *model.Namespace) error {
 		return err
 	}
 
+	volumeMounts := kube.ExtractVolumeMounts(
+		ds.Spec.Template.Spec.Containers,
+		ds.Spec.Template.Spec.Volumes,
+	)
+
 	workload := model.Workload{
-		Name:     ds.Name,
-		Kind:     "DaemonSet",
-		Replicas: 0, // DaemonSets don't have a fixed replica count
-		Labels:   ds.Spec.Selector.MatchLabels,
-		PVCNames: kube.ExtractPVCNames(ds.Spec.Template.Spec.Volumes),
+		Name:         ds.Name,
+		Kind:         "DaemonSet",
+		Replicas:     0, // DaemonSets don't have a fixed replica count
+		Labels:       ds.Spec.Selector.MatchLabels,
+		VolumeMounts: volumeMounts,
 	}
 
 	ns.DaemonSets = append(ns.DaemonSets, workload)

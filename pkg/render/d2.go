@@ -163,13 +163,22 @@ func (r *D2Renderer) writeWorkloadPVCConnections(b *strings.Builder, ns *model.N
 
 	for _, workloads := range workloadGroups {
 		for _, w := range workloads {
-			if len(w.PVCNames) == 0 {
+			if len(w.VolumeMounts) == 0 {
 				continue
 			}
+
 			workloadID := SanitizeID(w.Name)
-			for _, pvcName := range w.PVCNames {
+
+			// Group mounts by PVC (handle case where same PVC mounted at multiple paths)
+			mountsByPVC := make(map[string][]model.VolumeMount)
+			for _, mount := range w.VolumeMounts {
+				mountsByPVC[mount.PVCName] = append(mountsByPVC[mount.PVCName], mount)
+			}
+
+			for pvcName, mounts := range mountsByPVC {
 				pvcID := SanitizeID(pvcName)
-				fmt.Fprintf(b, "%s  %s -> pvc_%s\n", indent, workloadID, pvcID)
+				label := model.FormatMountLabel(mounts)
+				fmt.Fprintf(b, "%s  %s -> pvc_%s: \"%s\"\n", indent, workloadID, pvcID, label)
 			}
 		}
 	}
