@@ -147,9 +147,9 @@ func (m *Dagger) runK8sD2(
 		WithWorkdir("/output")
 
 	outputFile := "/output/test.d2"
-	args := []string{"k8sdd", "-n", "k8s-d2-test", "-o", outputFile}
+	args := []string{"k8sdd", "diagram", "-n", "k8s-d2-test", "-o", outputFile}
 	if includeStorage {
-		args = []string{"k8sdd", "-n", "k8s-d2-test", "--include-storage", "-o", outputFile}
+		args = []string{"k8sdd", "diagram", "-n", "k8s-d2-test", "--include-storage", "-o", outputFile}
 	}
 
 	file := ctr.WithExec(args).File(outputFile)
@@ -182,9 +182,9 @@ func (m *Dagger) runK8sD2Quiet(
 
 	var cmd string
 	if includeStorage {
-		cmd = fmt.Sprintf("k8sdd -n k8s-d2-test --include-storage -o %s --quiet > %s 2> %s", outputFile, stdoutFile, stderrFile)
+		cmd = fmt.Sprintf("k8sdd diagram -n k8s-d2-test --include-storage -o %s --quiet > %s 2> %s", outputFile, stdoutFile, stderrFile)
 	} else {
-		cmd = fmt.Sprintf("k8sdd -n k8s-d2-test -o %s --quiet > %s 2> %s", outputFile, stdoutFile, stderrFile)
+		cmd = fmt.Sprintf("k8sdd diagram -n k8s-d2-test -o %s --quiet > %s 2> %s", outputFile, stdoutFile, stderrFile)
 	}
 	args = append(args, cmd)
 
