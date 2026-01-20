@@ -1,75 +1,74 @@
 package main
 
 import (
-    "context"
-    "dagger/dagger/internal/dagger"
-    "fmt"
+	"context"
+	"dagger/dagger/internal/dagger"
+	"fmt"
 )
 
 type Dagger struct {
-    Src          *dagger.Directory
-    GoModCache   *dagger.Directory
-    GoBuildCache *dagger.Directory
+	Src          *dagger.Directory
+	GoBuildCache *dagger.Directory
 }
 
 func New(
-    // +defaultPath="/"
-    src *dagger.Directory,
+	// +defaultPath="/"
+	src *dagger.Directory,
 ) *Dagger {
-    return &Dagger{Src: src}
+	return &Dagger{Src: src}
 }
 
 func (m *Dagger) Run(
-    ctx context.Context,
-    dockerSocket *dagger.Socket,
-    kindSvc *dagger.Service,
-    // +optional
-    kubeconfig *dagger.Directory,
-    // +optional
-    goModCache *dagger.Directory,
-    // +optional
-    goBuildCache *dagger.Directory,
+	ctx context.Context,
+	dockerSocket *dagger.Socket,
+	kindSvc *dagger.Service,
+	// +optional
+	kubeconfig *dagger.Directory,
+	// Renamed to ensure the CLI maps it correctly to a host path
+	// +optional
+	goBuildDir *dagger.Directory,
 ) *dagger.Directory {
-    m.GoModCache = goModCache
-    m.GoBuildCache = goBuildCache
+	m.GoBuildCache = goBuildDir
 
-    var kindCtr *dagger.Container
-    var err error
+	var kindCtr *dagger.Container
+	var err error
 
-    if kubeconfig != nil {
-        kindCtr, err = m.KindFromService(ctx, kindSvc, kubeconfig)
-        if err != nil {
-            panic(err)
-        }
-    } else {
-        kindCtr = m.KindFromModule(dockerSocket, kindSvc)
-    }
+	if kubeconfig != nil {
+		kindCtr, err = m.KindFromService(ctx, kindSvc, kubeconfig)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		kindCtr = m.KindFromModule(dockerSocket, kindSvc)
+	}
 
-    // Run tests and capture the final container state
-    buildCtr := m.test(ctx, kindCtr)
+	// Run tests and capture the final container state
+	buildCtr := m.test(ctx, kindCtr)
 
-    // CI MODE: Return a directory bundle for export to host
-    if m.GoBuildCache != nil {
-        return dag.Directory().
-            WithDirectory("go-build", buildCtr.Directory("/root/.cache/go-build"))
-    }
+	// CI MODE: Return only the build cache for export to host
+	if m.GoBuildCache != nil {
+		return dag.Directory().
+			WithDirectory("go-build", buildCtr.Directory("/root/.cache/go-build"))
+	}
 
-    return dag.Directory()
+	return dag.Directory()
 }
 
 func (m *Dagger) BaseContainer() *dagger.Container {
-    ctr := dag.Container().
-        From("golang:1.24").
-        WithDirectory("/src", m.Src).
-        WithWorkdir("/src").
-        // ALWAYS use internal CacheVolume for modules (it's safe and fast)
-        WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod"))
+	ctr := dag.Container().
+		From("golang:1.24").
+		WithDirectory("/src", m.Src).
+		WithWorkdir("/src").
+		// ALWAYS use internal CacheVolume for modules (Safe & Fast)
+		WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod"))
 
-    if m.GoBuildCache != nil {
-        return ctr.WithMountedDirectory("/root/.cache/go-build", m.GoBuildCache)
-    }
+	if m.GoBuildCache != nil {
+		// Use the Directory passed from the GitHub Host
+		return ctr.WithMountedDirectory("/root/.cache/go-build", m.GoBuildCache)
+	}
 
-    return ctr.WithMountedCache("/root/.cache/go-build", dag.CacheVolume("go-build"))
+	// Local development fallback
+	return ctr.WithMountedCache("/root/.cache/go-build", dag.CacheVolume("go-build"))
 }
 
 func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) *dagger.Container {

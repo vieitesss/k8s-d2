@@ -30,7 +30,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Restore Dagger Cache
+      - name: Restore Build Cache
         uses: actions/cache@v4
         with:
           path: .cache/go-build
@@ -51,7 +51,7 @@ jobs:
             run
             --docker-socket /var/run/docker.sock
             --kind-svc tcp://host.docker.internal:3000
-            --go-build-cache ${{ github.workspace }}/.cache/go-build
+            --go-build-dir ${{ github.workspace }}/.cache/go-build
             export --path=${{ github.workspace }}/.cache
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
           version: "v0.19.10"
