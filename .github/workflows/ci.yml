@@ -39,7 +39,10 @@ jobs:
             ${{ runner.os }}-dagger-
 
       - name: Ensure Cache Structure
-        run: mkdir -p .cache/go-mod .cache/go-build
+        run: |
+          mkdir -p .cache/go-mod .cache/go-build
+          sudo chmod -R 777 .cache
+          ls -R .cache # Debug: ensure directories exist
 
       - name: Run Tests with Dagger
         uses: dagger/dagger-for-github@v8.2.0
@@ -49,8 +52,8 @@ jobs:
             run
             --docker-socket /var/run/docker.sock
             --kind-svc tcp://localhost:3000
-            --go-mod-cache=path:${{ github.workspace }}/.cache/go-mod
-            --go-build-cache=path:${{ github.workspace }}/.cache/go-build
+            --go-mod-cache ${{ github.workspace }}/.cache/go-mod
+            --go-build-cache ${{ github.workspace }}/.cache/go-build
             export --path=${{ github.workspace }}/.cache
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
           version: "v0.19.10"
