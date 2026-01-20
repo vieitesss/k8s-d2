@@ -48,10 +48,10 @@ jobs:
         with:
           module: ./dagger
           call: >-
+            --go-build-dir=${{ github.workspace }}/.cache/go-build
             run
-            --docker-socket /var/run/docker.sock
-            --kind-svc tcp://host.docker.internal:3000
-            --go-build-dir ${{ github.workspace }}/.cache/go-build
+            --docker-socket=/var/run/docker.sock
+            --kind-svc=tcp://host.docker.internal:3000
             export --path=${{ github.workspace }}/.cache
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
           version: "v0.19.10"
