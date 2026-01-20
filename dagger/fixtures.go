@@ -18,7 +18,7 @@ func ApplyFixtures(
 	// Clean up existing namespace to ensure fresh state
 	kindContainer, err = kindContainer.
 		// Delete namespace if it exists (ignore if not found)
-		WithExec([]string{"kubectl", "delete", "namespace", "k8s-d2-test", "--ignore-not-found=true", "--wait=true", "--timeout=60s"}).
+		WithExec([]string{"kubectl", "delete", "namespace", "k8s-d2-test", "--ignore-not-found=true", "--wait=true", "--timeout=60s", "--insecure-skip-tls-verify"}).
 		Sync(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to clean up namespace: %w", err)

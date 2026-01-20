@@ -104,16 +104,16 @@ func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container, kindSvc *d
 }
 
 func (m *Dagger) build(ctr *dagger.Container, kindSvc *dagger.Service) (*dagger.Container, *dagger.Container) {
-	buildCtr := m.BaseContainer(kindSvc).
-		WithEnvVariable("CGO_ENABLED", "0").
-		WithExec([]string{"go", "build", "-o", "k8sdd", "."})
+    buildCtr := m.BaseContainer(kindSvc).
+        WithEnvVariable("CGO_ENABLED", "0").
+        WithExec([]string{"go", "build", "-o", "k8sdd", "."})
 
-	binary := buildCtr.File("/src/k8sdd")
-	kindCtr := ctr.
-		WithFile("/usr/local/bin/k8sdd", binary).
-		WithExec([]string{"chmod", "+x", "/usr/local/bin/k8sdd"})
+    binary := buildCtr.File("/src/k8sdd")
+    kindCtr := ctr.
+        WithFile("/usr/local/bin/k8sdd", binary).
+        WithExec([]string{"chmod", "+x", "/usr/local/bin/k8sdd"})
 
-	return kindCtr, buildCtr
+    return kindCtr, buildCtr
 }
 
 func (m *Dagger) runValidationTests(ctx context.Context, b, s, q string, kindSvc *dagger.Service) (string, error) {
