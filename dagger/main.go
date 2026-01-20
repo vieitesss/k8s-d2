@@ -51,8 +51,7 @@ func (m *Dagger) Run(
     // CI MODE: Return a directory bundle for export to host
     if m.GoBuildCache != nil {
         return dag.Directory().
-            WithDirectory("go-build", buildCtr.Directory("/root/.cache/go-build")).
-            WithDirectory("go-mod", buildCtr.Directory("/go/pkg/mod"))
+            WithDirectory("go-build", buildCtr.Directory("/root/.cache/go-build"))
     }
 
     return dag.Directory()
