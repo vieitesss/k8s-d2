@@ -38,26 +38,23 @@ jobs:
       - name: Restore Go cache
         uses: actions/cache@v4
         with:
-          path: |
-            .cache/go-mod
-            .cache/go-build
-          key: ${{ runner.os }}-go-dagger-${{ hashFiles('**/go.sum') }}
+          path: .cache/go-build
+          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-dagger-
+            ${{ runner.os }}-go-build-
 
-      - name: Create cache directories
-        run: mkdir -p .cache/go-mod .cache/go-build
+      - name: Create cache directory
+        run: mkdir -p .cache/go-build
 
       - name: Run tests with Dagger
         uses: dagger/dagger-for-github@v8.2.0
         with:
           module: ./dagger
-          # Use absolute workspace paths to prevent directory resolution errors
+          # Pass only build cache to avoid GHA I/O hang with tiny files
           call: >-
             run
             --docker-socket /var/run/docker.sock
             --kind-svc tcp://localhost:3000
-            --go-mod-cache ${{ github.workspace }}/.cache/go-mod
             --go-build-cache ${{ github.workspace }}/.cache/go-build
             export --path ${{ github.workspace }}/.cache
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}

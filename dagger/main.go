@@ -22,7 +22,7 @@ func New(
 
 // Run executes tests. 
 // Locally: returns an empty directory to avoid Dagger cache-retrieve errors.
-// CI: returns populated cache directories for GitHub Actions to save.
+// CI: returns the populated go-build cache directory for GitHub Actions to save.
 func (m *Dagger) Run(
 	ctx context.Context,
 	dockerSocket *dagger.Socket,
@@ -53,21 +53,16 @@ func (m *Dagger) Run(
 	buildCtr := m.test(ctx, kindCtr)
 
 	// If no cache flags were passed (Local Mode), return an empty directory.
-	if m.GoModCache == nil {
+	if m.GoBuildCache == nil {
 		return dag.Directory()
 	}
 
-	// CI MODE: Extract directories. 
-	// We call .Sync() on the directories themselves to ensure they are ready for export.
-	modDir := buildCtr.Directory("/go/pkg/mod")
+	// CI MODE: Extract only the build cache.
+	// We skip go-mod because thousands of tiny files cause GitHub I/O hangs.
 	buildDir := buildCtr.Directory("/root/.cache/go-build")
-
-	_, _ = modDir.Sync(ctx)
 	_, _ = buildDir.Sync(ctx)
 
-	return dag.Directory().
-		WithDirectory("go-mod", modDir).
-		WithDirectory("go-build", buildDir)
+	return dag.Directory().WithDirectory("go-build", buildDir)
 }
 
 func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) *dagger.Container {
@@ -99,6 +94,7 @@ func (m *Dagger) BaseContainer() *dagger.Container {
 		WithDirectory("/src", m.Src).
 		WithWorkdir("/src")
 
+	// Even if we don't export go-mod, we still use the mount for the current run
 	if m.GoModCache != nil {
 		return ctr.
 			WithMountedDirectory("/go/pkg/mod", m.GoModCache).
