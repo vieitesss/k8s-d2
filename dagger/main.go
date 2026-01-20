@@ -61,19 +61,15 @@ func (m *Dagger) BaseContainer() *dagger.Container {
     ctr := dag.Container().
         From("golang:1.24").
         WithDirectory("/src", m.Src).
-        WithWorkdir("/src")
+        WithWorkdir("/src").
+        // ALWAYS use internal CacheVolume for modules (it's safe and fast)
+        WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod"))
 
     if m.GoBuildCache != nil {
-        // CI: Bind-mount the directories restored by actions/cache
-        return ctr.
-            WithMountedDirectory("/go/pkg/mod", m.GoModCache).
-            WithMountedDirectory("/root/.cache/go-build", m.GoBuildCache)
+        return ctr.WithMountedDirectory("/root/.cache/go-build", m.GoBuildCache)
     }
 
-    // LOCAL: Use high-performance internal volumes
-    return ctr.
-        WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod")).
-        WithMountedCache("/root/.cache/go-build", dag.CacheVolume("go-build"))
+    return ctr.WithMountedCache("/root/.cache/go-build", dag.CacheVolume("go-build"))
 }
 
 func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) *dagger.Container {

@@ -33,16 +33,15 @@ jobs:
       - name: Restore Dagger Cache
         uses: actions/cache@v4
         with:
-          path: .cache
-          key: ${{ runner.os }}-dagger-${{ hashFiles('**/go.sum') }}
+          path: .cache/go-build
+          key: ${{ runner.os }}-dagger-build-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-dagger-
+            ${{ runner.os }}-dagger-build-
 
       - name: Ensure Cache Structure
         run: |
-          mkdir -p .cache/go-mod .cache/go-build
+          mkdir -p .cache/go-build
           sudo chmod -R 777 .cache
-          ls -R .cache # Debug: ensure directories exist
 
       - name: Run Tests with Dagger
         uses: dagger/dagger-for-github@v8.2.0
@@ -51,8 +50,7 @@ jobs:
           call: >-
             run
             --docker-socket /var/run/docker.sock
-            --kind-svc tcp://localhost:3000
-            --go-mod-cache ${{ github.workspace }}/.cache/go-mod
+            --kind-svc tcp://host.docker.internal:3000
             --go-build-cache ${{ github.workspace }}/.cache/go-build
             export --path=${{ github.workspace }}/.cache
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
