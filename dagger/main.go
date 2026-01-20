@@ -15,6 +15,7 @@ func New(
 	// +defaultPath="/"
 	src *dagger.Directory,
 	// Moving this to the constructor ensures the CLI maps the host path correctly
+	// and allows us to use it across all internal functions.
 	// +optional
 	goBuildDir *dagger.Directory,
 ) *Dagger {
@@ -41,7 +42,7 @@ func (m *Dagger) Run(
 			panic(err)
 		}
 	} else {
-		// Ensure your KindFromModule also uses WithServiceBinding if it hits localhost
+		// Ensure KindFromModule uses WithServiceBinding so it can reach the cluster
 		kindCtr = m.KindFromModule(dockerSocket, kindSvc).
 			WithServiceBinding("localhost", kindSvc)
 	}
@@ -49,7 +50,8 @@ func (m *Dagger) Run(
 	// Run tests and capture the final container state
 	buildCtr := m.test(ctx, kindCtr, kindSvc)
 
-	// CI MODE: Return only the build cache for export to host
+	// SERVERLESS CI MODE: Return the build cache directory.
+	// This allows the 'dagger export' command to save the cache back to the runner host.
 	if m.GoBuildCache != nil {
 		return dag.Directory().
 			WithDirectory("go-build", buildCtr.Directory("/root/.cache/go-build"))
@@ -71,6 +73,7 @@ func (m *Dagger) BaseContainer(kindSvc *dagger.Service) *dagger.Container {
 		ctr = ctr.WithServiceBinding("localhost", kindSvc)
 	}
 
+	// Use the Directory passed from the Host if available, otherwise use a CacheVolume
 	if m.GoBuildCache != nil {
 		return ctr.WithMountedDirectory("/root/.cache/go-build", m.GoBuildCache)
 	}

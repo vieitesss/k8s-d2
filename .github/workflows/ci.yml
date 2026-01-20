@@ -34,6 +34,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .cache/go-build
+          # Using go.sum in the key ensures the cache invalidates if dependencies change
           key: ${{ runner.os }}-dagger-build-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-dagger-build-
@@ -41,12 +42,17 @@ jobs:
       - name: Ensure Cache Structure
         run: |
           mkdir -p .cache/go-build
+          # Ensure the Dagger Engine (running as root) can write to this host folder
           sudo chmod -R 777 .cache
 
       - name: Run Tests with Dagger
         uses: dagger/dagger-for-github@v8.2.0
         with:
           module: ./dagger
+          # THE FIX: 
+          # 1. Provide absolute path to the Constructor flag (--go-build-dir) 
+          #    BEFORE the 'run' command.
+          # 2. Use 'export' AFTER 'run' to write the returned Directory back to the host.
           call: >-
             --go-build-dir=${{ github.workspace }}/.cache/go-build
             run
@@ -58,4 +64,7 @@ jobs:
 
       - name: Fix Permissions for Cache Upload
         if: always()
-        run: sudo chmod -R a+rw .cache
+        run: |
+          # Dagger exports files as root; we must make them readable by the 
+          # GitHub Actions user so the cache-saver can upload them.
+          sudo chmod -R a+rw .cache
