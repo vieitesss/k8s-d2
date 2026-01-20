@@ -1,82 +1,80 @@
 package main
 
 import (
-	"context"
-	"dagger/dagger/internal/dagger"
-	"fmt"
+    "context"
+    "dagger/dagger/internal/dagger"
+    "fmt"
 )
 
 type Dagger struct {
-	Src          *dagger.Directory
-	GoModCache   *dagger.Directory
-	GoBuildCache *dagger.Directory
+    Src          *dagger.Directory
+    GoModCache   *dagger.Directory
+    GoBuildCache *dagger.Directory
 }
 
 func New(
-	// +defaultPath="/"
-	src *dagger.Directory,
+    // +defaultPath="/"
+    src *dagger.Directory,
 ) *Dagger {
-	return &Dagger{Src: src}
+    return &Dagger{Src: src}
 }
 
 func (m *Dagger) Run(
-	ctx context.Context,
-	dockerSocket *dagger.Socket,
-	kindSvc *dagger.Service,
-	// +optional
-	kubeconfig *dagger.Directory,
-	// +optional
-	goModCache *dagger.Directory,
-	// +optional
-	goBuildCache *dagger.Directory,
+    ctx context.Context,
+    dockerSocket *dagger.Socket,
+    kindSvc *dagger.Service,
+    // +optional
+    kubeconfig *dagger.Directory,
+    // +optional
+    goModCache *dagger.Directory,
+    // +optional
+    goBuildCache *dagger.Directory,
 ) *dagger.Directory {
-	// Assigning these allows BaseContainer to decide mount type
-	m.GoModCache = goModCache
-	m.GoBuildCache = goBuildCache
+    m.GoModCache = goModCache
+    m.GoBuildCache = goBuildCache
 
-	var kindCtr *dagger.Container
-	var err error
+    var kindCtr *dagger.Container
+    var err error
 
-	if kubeconfig != nil {
-		kindCtr, err = m.KindFromService(ctx, kindSvc, kubeconfig)
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		kindCtr = m.KindFromModule(dockerSocket, kindSvc)
-	}
+    if kubeconfig != nil {
+        kindCtr, err = m.KindFromService(ctx, kindSvc, kubeconfig)
+        if err != nil {
+            panic(err)
+        }
+    } else {
+        kindCtr = m.KindFromModule(dockerSocket, kindSvc)
+    }
 
-	// Run tests
-	buildCtr := m.test(ctx, kindCtr)
+    // Run tests and capture the final container state
+    buildCtr := m.test(ctx, kindCtr)
 
-	// --- THE CRITICAL FIX ---
-	// We only attempt to extract the directory if we are in CI mode 
-	// (meaning goBuildCache was provided as a Directory, not a CacheVolume).
-	if m.GoBuildCache != nil {
-		// Ensure the directory exists before retrieving
-		return dag.Directory().WithDirectory("go-build", buildCtr.Directory("/root/.cache/go-build"))
-	}
+    // CI MODE: Return a directory bundle for export to host
+    if m.GoBuildCache != nil {
+        return dag.Directory().
+            WithDirectory("go-build", buildCtr.Directory("/root/.cache/go-build")).
+            WithDirectory("go-mod", buildCtr.Directory("/go/pkg/mod"))
+    }
 
-	return dag.Directory()
+    return dag.Directory()
 }
 
 func (m *Dagger) BaseContainer() *dagger.Container {
-	ctr := dag.Container().
-		From("golang:1.24").
-		WithDirectory("/src", m.Src).
-		WithWorkdir("/src")
+    ctr := dag.Container().
+        From("golang:1.24").
+        WithDirectory("/src", m.Src).
+        WithWorkdir("/src")
 
-	if m.GoBuildCache != nil {
-		// CI MODE: Mount external directories (Required for Export)
-		return ctr.
-			WithMountedDirectory("/go/pkg/mod", m.GoModCache).
-			WithMountedDirectory("/root/.cache/go-build", m.GoBuildCache)
-	}
+    if m.GoBuildCache != nil {
+        // CI: Bind-mount the directories restored by actions/cache
+        return ctr.
+            WithMountedDirectory("/go/pkg/mod", m.GoModCache).
+            WithMountedDirectory("/root/.cache/go-build", m.GoBuildCache)
+    }
 
-	// LOCAL MODE: Use internal Cache Volumes (Cannot be exported)
-	return ctr.
-		WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod")).
-		WithMountedCache("/root/.cache/go-build", dag.CacheVolume("go-build"))
+    // LOCAL: Use high-performance internal volumes
+    return ctr.
+        WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod")).
+        WithMountedCache("/root/.cache/go-build", dag.CacheVolume("go-build"))
 }
 
 func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) *dagger.Container {
