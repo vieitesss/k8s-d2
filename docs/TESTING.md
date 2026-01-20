@@ -44,8 +44,8 @@ If you have access to a Kubernetes cluster (requires valid kubeconfig):
 # Test specific namespace
 ./k8sdd -n kube-system -o system.d2
 
-# Test in silent mode
-./k8sdd -n default --quiet -o silent.d2
+# Test in quiet mode
+./k8sdd -n default --quiet -o quiet.d2
 ```
 
 ## Edge Cases to Test
