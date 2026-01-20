@@ -38,6 +38,19 @@ jobs:
         with:
           go-version: '1.25.4'
 
+      - name: Restore Go cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/go-mod
+            .cache/go-build
+          key: ${{ runner.os }}-go-dagger-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-dagger-
+
+      - name: Create cache directories
+        run: mkdir -p .cache/go-mod .cache/go-build
+
       - name: Run tests with Dagger
         uses: dagger/dagger-for-github@v8.2.0
         with:
@@ -46,5 +59,11 @@ jobs:
             run
             --docker-socket /var/run/docker.sock
             --kind-svc tcp://localhost:3000
+            --go-mod-cache .cache/go-mod
+            --go-build-cache .cache/go-build
+            export --path .cache
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
           version: "v0.19.7"
+
+      - name: Fix cache permissions
+        run: sudo chmod -R a+rw .cache

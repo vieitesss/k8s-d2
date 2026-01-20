@@ -14,6 +14,12 @@ import (
 type Dagger struct {
 	// Defaults to the root of the repository.
 	Src *dagger.Directory
+
+	// Go module cache directory (optional, for GitHub Actions caching)
+	GoModCache *dagger.Directory
+
+	// Go build cache directory (optional, for GitHub Actions caching)
+	GoBuildCache *dagger.Directory
 }
 
 func New(
@@ -25,7 +31,8 @@ func New(
 	}
 }
 
-// Use when the kind cluster needs to be created.
+// Run executes tests and returns populated cache directories for GitHub Actions caching.
+// Test results are printed to stdout. Returns cache directories for export.
 func (m *Dagger) Run(
 	ctx context.Context,
 
@@ -40,64 +47,98 @@ func (m *Dagger) Run(
 	// Example: `$HOME/.kube`
 	// +optional
 	kubeconfig *dagger.Directory,
-) (string, error) {
+
+	// Go module cache directory for GitHub Actions caching
+	// +optional
+	goModCache *dagger.Directory,
+
+	// Go build cache directory for GitHub Actions caching
+	// +optional
+	goBuildCache *dagger.Directory,
+) *dagger.Directory {
+	// Store cache directories for use in BaseContainer
+	m.GoModCache = goModCache
+	m.GoBuildCache = goBuildCache
+
 	var kindCtr *dagger.Container
 	var err error
 
 	if kubeconfig != nil {
 		kindCtr, err = m.KindFromService(ctx, kindSvc, kubeconfig)
+		if err != nil {
+			panic(fmt.Errorf("failed to create kind container: %w", err))
+		}
 	} else {
 		kindCtr = m.KindFromModule(dockerSocket, kindSvc)
 	}
-	if err != nil {
-		return "", fmt.Errorf("failed to create kind container: %w", err)
-	}
 
-	return m.test(ctx, kindCtr)
+	// Run tests and get the build container with populated caches
+	buildCtr := m.test(ctx, kindCtr)
+
+	// Return populated cache directories from the actual build container
+	return dag.Directory().
+		WithDirectory("go-mod", buildCtr.Directory("/go/pkg/mod")).
+		WithDirectory("go-build", buildCtr.Directory("/root/.cache/go-build"))
 }
 
-func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) (string, error) {
-	kindBinaryCtr := m.build(kindCtr)
+// test runs all tests and returns the build container (which has populated Go caches)
+func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) *dagger.Container {
+	kindBinaryCtr, buildCtr := m.build(kindCtr)
 
 	fixturesDir := m.Src.Directory("test/fixtures")
 
 	kindBinFixCtr, err := ApplyFixtures(ctx, kindBinaryCtr, fixturesDir, true)
 	if err != nil {
-		return "", fmt.Errorf("failed to apply fixtures: %w", err)
+		panic(fmt.Errorf("failed to apply fixtures: %w", err))
 	}
 
 	// Generate D2 outputs from real cluster
 	basicOutput, err := m.runK8sD2(ctx, kindBinFixCtr, false)
 	if err != nil {
-		return "", fmt.Errorf("k8s-d2 execution failed (basic): %w", err)
+		panic(fmt.Errorf("k8s-d2 execution failed (basic): %w", err))
 	}
 
 	storageOutput, err := m.runK8sD2(ctx, kindBinFixCtr, true)
 	if err != nil {
-		return "", fmt.Errorf("k8s-d2 execution failed (storage): %w", err)
+		panic(fmt.Errorf("k8s-d2 execution failed (storage): %w", err))
 	}
 
 	quietOutput, err := m.runK8sD2Quiet(ctx, kindBinFixCtr, false)
 	if err != nil {
-		return "", fmt.Errorf("k8s-d2 execution failed (quiet mode): %w", err)
+		panic(fmt.Errorf("k8s-d2 execution failed (quiet mode): %w", err))
 	}
 
 	// Run Go tests to validate the D2 outputs
 	testOutput, err := m.runValidationTests(ctx, basicOutput, storageOutput, quietOutput)
 	if err != nil {
-		return "", fmt.Errorf("validation tests failed: %w", err)
+		panic(fmt.Errorf("validation tests failed: %w", err))
 	}
 
-	return fmt.Sprintf("All tests passed! ✓\n- Basic topology validated\n- Storage layer validated\n- D2 syntax correct\n- All resources present\n- Quiet flag validated\n\nTest output:\n%s", testOutput), nil
+	fmt.Printf("All tests passed!\n- Basic topology validated\n- Storage layer validated\n- D2 syntax correct\n- All resources present\n- Quiet flag validated\n\nTest output:\n%s\n", testOutput)
+
+	return buildCtr
 }
 
 func (m *Dagger) BaseContainer() *dagger.Container {
-	return dag.Container().
+	ctr := dag.Container().
 		From("golang:1.24").
 		WithDirectory("/src", m.Src).
-		WithWorkdir("/src").
-		WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod")).
-		WithMountedCache("/root/.cache/go-build", dag.CacheVolume("go-build"))
+		WithWorkdir("/src")
+
+	// Use GitHub Actions cache directories if provided, otherwise fall back to Dagger CacheVolume
+	if m.GoModCache != nil {
+		ctr = ctr.WithMountedDirectory("/go/pkg/mod", m.GoModCache)
+	} else {
+		ctr = ctr.WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod"))
+	}
+
+	if m.GoBuildCache != nil {
+		ctr = ctr.WithMountedDirectory("/root/.cache/go-build", m.GoBuildCache)
+	} else {
+		ctr = ctr.WithMountedCache("/root/.cache/go-build", dag.CacheVolume("go-build"))
+	}
+
+	return ctr
 }
 
 // runValidationTests runs Go tests to validate D2 outputs
@@ -121,16 +162,20 @@ func (m *Dagger) runValidationTests(
 	return output, nil
 }
 
-// build compiles k8s-d2 binary
-func (m *Dagger) build(ctr *dagger.Container) *dagger.Container {
-	binary := m.BaseContainer().
+// build compiles k8s-d2 binary and returns both the kind container with the binary
+// and the build container (which has the populated Go caches)
+func (m *Dagger) build(ctr *dagger.Container) (*dagger.Container, *dagger.Container) {
+	buildCtr := m.BaseContainer().
 		WithEnvVariable("CGO_ENABLED", "0").
-		WithExec([]string{"go", "build", "-o", "k8sdd", "."}).
-		File("/src/k8sdd")
+		WithExec([]string{"go", "build", "-o", "k8sdd", "."})
 
-	return ctr.
+	binary := buildCtr.File("/src/k8sdd")
+
+	kindCtr := ctr.
 		WithFile("/usr/local/bin/k8sdd", binary).
 		WithExec([]string{"chmod", "+x", "/usr/local/bin/k8sdd"})
+
+	return kindCtr, buildCtr
 }
 
 // runK8sD2 executes k8s-d2 against the cluster and returns D2 output
