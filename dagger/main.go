@@ -1,4 +1,3 @@
-// Dagger CI module for k8s-d2
 package main
 
 import (
@@ -20,9 +19,6 @@ func New(
 	return &Dagger{Src: src}
 }
 
-// Run executes tests. 
-// Locally: returns an empty directory to avoid Dagger cache-retrieve errors.
-// CI: returns the populated go-build cache directory for GitHub Actions to save.
 func (m *Dagger) Run(
 	ctx context.Context,
 	dockerSocket *dagger.Socket,
@@ -34,6 +30,7 @@ func (m *Dagger) Run(
 	// +optional
 	goBuildCache *dagger.Directory,
 ) *dagger.Directory {
+	// Assigning these allows BaseContainer to decide mount type
 	m.GoModCache = goModCache
 	m.GoBuildCache = goBuildCache
 
@@ -43,49 +40,24 @@ func (m *Dagger) Run(
 	if kubeconfig != nil {
 		kindCtr, err = m.KindFromService(ctx, kindSvc, kubeconfig)
 		if err != nil {
-			panic(fmt.Errorf("failed to create kind container: %w", err))
+			panic(err)
 		}
 	} else {
 		kindCtr = m.KindFromModule(dockerSocket, kindSvc)
 	}
 
-	// Run tests and get the build container
+	// Run tests
 	buildCtr := m.test(ctx, kindCtr)
 
-	// If no cache flags were passed (Local Mode), return an empty directory.
-	if m.GoBuildCache == nil {
-		return dag.Directory()
+	// --- THE CRITICAL FIX ---
+	// We only attempt to extract the directory if we are in CI mode 
+	// (meaning goBuildCache was provided as a Directory, not a CacheVolume).
+	if m.GoBuildCache != nil {
+		// Ensure the directory exists before retrieving
+		return dag.Directory().WithDirectory("go-build", buildCtr.Directory("/root/.cache/go-build"))
 	}
 
-	// CI MODE: Extract only the build cache.
-	// We skip go-mod because thousands of tiny files cause GitHub I/O hangs.
-	buildDir := buildCtr.Directory("/root/.cache/go-build")
-	_, _ = buildDir.Sync(ctx)
-
-	return dag.Directory().WithDirectory("go-build", buildDir)
-}
-
-func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) *dagger.Container {
-	kindBinaryCtr, buildCtr := m.build(kindCtr)
-	fixturesDir := m.Src.Directory("test/fixtures")
-
-	kindBinFixCtr, err := ApplyFixtures(ctx, kindBinaryCtr, fixturesDir, true)
-	if err != nil {
-		panic(fmt.Errorf("failed to apply fixtures: %w", err))
-	}
-
-	basic, _ := m.runK8sD2(ctx, kindBinFixCtr, false)
-	storage, _ := m.runK8sD2(ctx, kindBinFixCtr, true)
-	quiet, _ := m.runK8sD2Quiet(ctx, kindBinFixCtr, false)
-
-	testOutput, err := m.runValidationTests(ctx, basic, storage, quiet)
-	if err != nil {
-		panic(fmt.Errorf("validation tests failed: %w", err))
-	}
-
-	fmt.Printf("All tests passed!\n%s\n", testOutput)
-
-	return buildCtr
+	return dag.Directory()
 }
 
 func (m *Dagger) BaseContainer() *dagger.Container {
@@ -94,16 +66,39 @@ func (m *Dagger) BaseContainer() *dagger.Container {
 		WithDirectory("/src", m.Src).
 		WithWorkdir("/src")
 
-	// Even if we don't export go-mod, we still use the mount for the current run
-	if m.GoModCache != nil {
+	if m.GoBuildCache != nil {
+		// CI MODE: Mount external directories (Required for Export)
 		return ctr.
 			WithMountedDirectory("/go/pkg/mod", m.GoModCache).
 			WithMountedDirectory("/root/.cache/go-build", m.GoBuildCache)
 	}
 
+	// LOCAL MODE: Use internal Cache Volumes (Cannot be exported)
 	return ctr.
 		WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod")).
 		WithMountedCache("/root/.cache/go-build", dag.CacheVolume("go-build"))
+}
+
+func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) *dagger.Container {
+	kindBinaryCtr, buildCtr := m.build(kindCtr)
+	fixturesDir := m.Src.Directory("test/fixtures")
+	
+	kindBinFixCtr, err := ApplyFixtures(ctx, kindBinaryCtr, fixturesDir, true)
+	if err != nil {
+		panic(err)
+	}
+
+	b, _ := m.runK8sD2(ctx, kindBinFixCtr, false)
+	s, _ := m.runK8sD2(ctx, kindBinFixCtr, true)
+	q, _ := m.runK8sD2Quiet(ctx, kindBinFixCtr, false)
+
+	out, err := m.runValidationTests(ctx, b, s, q)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Validation passed: %s\n", out)
+
+	return buildCtr
 }
 
 func (m *Dagger) build(ctr *dagger.Container) (*dagger.Container, *dagger.Container) {
