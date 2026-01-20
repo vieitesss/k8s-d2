@@ -26,38 +26,40 @@ func New(
 }
 
 func (m *Dagger) Run(
-	ctx context.Context,
-	dockerSocket *dagger.Socket,
-	kindSvc *dagger.Service,
-	// +optional
-	kubeconfig *dagger.Directory,
+    ctx context.Context,
+    dockerSocket *dagger.Socket,
+    kindSvc *dagger.Service,
+    // +optional
+    kubeconfig *dagger.Directory,
 ) *dagger.Directory {
-	var kindCtr *dagger.Container
-	var err error
+    var kindCtr *dagger.Container
+    
+    // 1. Get the real internal endpoint (e.g., "kind:3000")
+    endpoint, err := kindSvc.Endpoint(ctx)
+    if err != nil {
+        panic(err)
+    }
 
-	// We bind the service to "localhost" so kubectl/k8sdd can reach it inside the container
-	if kubeconfig != nil {
-		kindCtr, err = m.KindFromService(ctx, kindSvc, kubeconfig)
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		// Ensure KindFromModule uses WithServiceBinding so it can reach the cluster
-		kindCtr = m.KindFromModule(dockerSocket, kindSvc).
-			WithServiceBinding("localhost", kindSvc)
-	}
+    if kubeconfig != nil {
+        kindCtr, err = m.KindFromService(ctx, kindSvc, kubeconfig)
+    } else {
+        kindCtr = m.KindFromModule(dockerSocket, kindSvc)
+    }
 
-	// Run tests and capture the final container state
-	buildCtr := m.test(ctx, kindCtr, kindSvc)
+    // 2. FORCE kubectl to use the service endpoint and skip TLS checks
+    // This is the "Nuclear Option" that fixes EOF in CI
+    kindCtr = kindCtr.
+        WithServiceBinding("kind-cluster", kindSvc).
+        WithExec([]string{"kubectl", "config", "set-cluster", "kind-dagger-kubernetes-cluster", "--server=https://" + endpoint}).
+        WithExec([]string{"kubectl", "config", "set-cluster", "kind-dagger-kubernetes-cluster", "--insecure-skip-tls-verify=true"})
 
-	// SERVERLESS CI MODE: Return the build cache directory.
-	// This allows the 'dagger export' command to save the cache back to the runner host.
-	if m.GoBuildCache != nil {
-		return dag.Directory().
-			WithDirectory("go-build", buildCtr.Directory("/root/.cache/go-build"))
-	}
+    buildCtr := m.test(ctx, kindCtr, kindSvc)
 
-	return dag.Directory()
+    if m.GoBuildCache != nil {
+        return dag.Directory().
+            WithDirectory("go-build", buildCtr.Directory("/root/.cache/go-build"))
+    }
+    return dag.Directory()
 }
 
 func (m *Dagger) BaseContainer(kindSvc *dagger.Service) *dagger.Container {
