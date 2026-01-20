@@ -9,6 +9,19 @@ permissions:
   contents: read
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -20,7 +33,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24' # Matches Dagger From("golang:1.24")
+          go-version: '1.24'
 
       - name: Restore Go cache
         uses: actions/cache@v4
@@ -39,17 +52,17 @@ jobs:
         uses: dagger/dagger-for-github@v8.2.0
         with:
           module: ./dagger
+          # Use absolute workspace paths to prevent directory resolution errors
           call: >-
             run
             --docker-socket /var/run/docker.sock
             --kind-svc tcp://localhost:3000
-            --go-mod-cache .cache/go-mod
-            --go-build-cache .cache/go-build
-            export --path .cache
+            --go-mod-cache ${{ github.workspace }}/.cache/go-mod
+            --go-build-cache ${{ github.workspace }}/.cache/go-build
+            export --path ${{ github.workspace }}/.cache
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
           version: "v0.19.7"
 
-      # This is critical. GitHub won't save the cache if files are owned by root
       - name: Fix cache permissions
         if: always()
         run: sudo chmod -R a+rw .cache
