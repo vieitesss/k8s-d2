@@ -104,7 +104,7 @@ When unsure about patterns, look at these files:
 
 ## Cyclomatic Complexity
 
-Keep functions under complexity 15. If a function exceeds this:
+Keep functions under complexity 15. This threshold aligns with our project maintainability guidelines and the common default used by tools like `gocyclo`. If a function exceeds this:
 - Extract helper methods
 - Reduce nesting (early returns help)
 - Split into smaller functions
