@@ -75,7 +75,8 @@ func (m *Dagger) Run(
 	// Run tests and get the build container with populated caches
 	buildCtr := m.test(ctx, kindCtr)
 
-	// Return populated cache directories from the actual build container
+	// Return populated cache directories from the actual build container.
+	// This only works because BaseContainer used WithMountedDirectory instead of WithMountedCache.
 	return dag.Directory().
 		WithDirectory("go-mod", buildCtr.Directory("/go/pkg/mod")).
 		WithDirectory("go-build", buildCtr.Directory("/root/.cache/go-build"))
@@ -116,6 +117,12 @@ func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) *dagger.Co
 
 	fmt.Printf("All tests passed!\n- Basic topology validated\n- Storage layer validated\n- D2 syntax correct\n- All resources present\n- Quiet flag validated\n\nTest output:\n%s\n", testOutput)
 
+	// Sync the build container to ensure all writes are flushed before we extract directories
+	_, err = buildCtr.Sync(ctx)
+	if err != nil {
+		panic(fmt.Errorf("failed to sync build container: %w", err))
+	}
+
 	return buildCtr
 }
 
@@ -125,7 +132,8 @@ func (m *Dagger) BaseContainer() *dagger.Container {
 		WithDirectory("/src", m.Src).
 		WithWorkdir("/src")
 
-	// Use GitHub Actions cache directories if provided, otherwise fall back to Dagger CacheVolume
+	// Logic: If a directory is provided (CI), we use WithMountedDirectory so we can export it later.
+	// If no directory is provided (Local), we use WithMountedCache for engine-side persistence.
 	if m.GoModCache != nil {
 		ctr = ctr.WithMountedDirectory("/go/pkg/mod", m.GoModCache)
 	} else {
@@ -181,10 +189,7 @@ func (m *Dagger) build(ctr *dagger.Container) (*dagger.Container, *dagger.Contai
 // runK8sD2 executes k8s-d2 against the cluster and returns D2 output
 func (m *Dagger) runK8sD2(
 	ctx context.Context,
-
-	// Container with k8sdd binary
 	ctr *dagger.Container,
-
 	includeStorage bool,
 ) (string, error) {
 	ctr = ctr.
@@ -210,10 +215,7 @@ func (m *Dagger) runK8sD2(
 // runK8sD2Quiet executes k8s-d2 with --quiet flag, validates no logs are emitted, and returns D2 output
 func (m *Dagger) runK8sD2Quiet(
 	ctx context.Context,
-
-	// Container with k8sdd binary
 	ctr *dagger.Container,
-
 	includeStorage bool,
 ) (string, error) {
 	ctr = ctr.
@@ -235,7 +237,6 @@ func (m *Dagger) runK8sD2Quiet(
 
 	execCtr := ctr.WithExec(args)
 
-	// Check stdout for unwanted output.
 	stdout, err := execCtr.File(stdoutFile).Contents(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to read stdout: %w", err)
@@ -245,7 +246,6 @@ func (m *Dagger) runK8sD2Quiet(
 		return "", fmt.Errorf("quiet mode test failed: stdout should be empty but contains: %s", stdout)
 	}
 
-	// Get the D2 output
 	output, err := execCtr.File(outputFile).Contents(ctx)
 	if err != nil {
 		return "", err

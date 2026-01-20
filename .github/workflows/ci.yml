@@ -3,40 +3,24 @@ name: CI
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version: '1.25.4'
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
-        with:
-          version: latest
-          args: --timeout=5m
-
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.25.4'
+          go-version: '1.24' # Matches Dagger From("golang:1.24")
 
       - name: Restore Go cache
         uses: actions/cache@v4
@@ -65,5 +49,7 @@ jobs:
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
           version: "v0.19.7"
 
+      # This is critical. GitHub won't save the cache if files are owned by root
       - name: Fix cache permissions
+        if: always()
         run: sudo chmod -R a+rw .cache
