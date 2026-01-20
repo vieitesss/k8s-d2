@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +25,12 @@ var rootCmd = &cobra.Command{
 visualizing namespaces, workloads, services, and their relationships.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	RunE:          runGenerate,
+	RunE:          runRoot,
+}
+
+func runRoot(cmd *cobra.Command, args []string) error {
+	log.Warn("DEPRECATED: Running k8sdd without a subcommand is deprecated. Please use 'k8sdd diagram' instead. This will be removed in v1.0.0.")
+	return runGenerate(cmd, args)
 }
 
 func init() {
