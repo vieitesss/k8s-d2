@@ -3,6 +3,7 @@
 .gemini-clipboard/
 CLAUDE.md
 GEMINI.md
+.DS_Store
 
 # Build artifacts
 k8s-d2
