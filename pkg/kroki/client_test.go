@@ -21,7 +21,7 @@ func TestGenerateSVG_Success(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write(mockSVG)
+		_, _ = w.Write(mockSVG)
 	}))
 	defer server.Close()
 
@@ -47,7 +47,7 @@ func TestGenerateSVG_Success(t *testing.T) {
 func TestGenerateSVG_NonOKStatus(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("invalid diagram syntax"))
+		_, _ = w.Write([]byte("invalid diagram syntax"))
 	}))
 	defer server.Close()
 
@@ -65,7 +65,7 @@ func TestGenerateSVG_NonOKStatus(t *testing.T) {
 func TestGenerateSVG_ServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("internal server error"))
+		_, _ = w.Write([]byte("internal server error"))
 	}))
 	defer server.Close()
 
