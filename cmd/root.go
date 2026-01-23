@@ -10,6 +10,7 @@ type RootOptions struct {
 	namespace      string
 	allNamespaces  bool
 	output         string
+	image          string
 	includeStorage bool
 	gridColumns    int
 	showVersion    bool
