@@ -38,7 +38,7 @@ func init() {
 	rootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		cmd.Println(err)
 		cmd.Println()
-		cmd.Help()
+		_ = cmd.Help()
 		return err
 	})
 
