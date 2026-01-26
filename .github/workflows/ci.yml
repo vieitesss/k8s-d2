@@ -25,7 +25,19 @@ jobs:
           version: latest
           args: --timeout=5m
 
-  test:
+  unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.4'
+
+      - name: Run unit tests
+        run: go test -v ./pkg/... ./cmd/...
+
+  integration-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -38,7 +50,7 @@ jobs:
         with:
           go-version: '1.25.4'
 
-      - name: Run tests with Dagger
+      - name: Run integration tests with Dagger
         uses: dagger/dagger-for-github@v8.2.0
         with:
           module: ./dagger

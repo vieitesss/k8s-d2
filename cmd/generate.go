@@ -1,12 +1,17 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
+	"github.com/vieitesss/k8s-d2/pkg/kroki"
 	"github.com/vieitesss/k8s-d2/pkg/kube"
 	"github.com/vieitesss/k8s-d2/pkg/model"
 	"github.com/vieitesss/k8s-d2/pkg/render"
@@ -18,6 +23,11 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	// Configure logger for quiet mode - suppress INFO but keep WARN/ERROR
 	if rootOptions.quiet {
 		log.SetLevel(log.WarnLevel)
+	}
+
+	// Validate mutually exclusive flags
+	if rootOptions.output != "" && rootOptions.image != "" {
+		return errors.New("flags --output/-o and --image/-i are mutually exclusive")
 	}
 
 	client, err := createClientWithSpinner()
@@ -34,6 +44,11 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	cluster, err := fetchTopologyWithSpinner(cmd.Context(), client, opts)
 	if err != nil {
 		return err
+	}
+
+	// If image output is requested, render to buffer and send to Kroki
+	if rootOptions.image != "" {
+		return generateImage(cluster)
 	}
 
 	w, closeWriter, err := getOutputWriter()
@@ -131,4 +146,65 @@ func renderWithSpinner(cluster *model.Cluster, w *os.File) error {
 		return spinnerErr
 	}
 	return renderErr
+}
+
+func generateImage(cluster *model.Cluster) error {
+	// Ensure output file has .svg extension (Kroki only supports SVG for D2)
+	outputFile := rootOptions.image
+	if strings.ToLower(filepath.Ext(outputFile)) != ".svg" {
+		outputFile = strings.TrimSuffix(outputFile, filepath.Ext(outputFile)) + ".svg"
+	}
+
+	// Render D2 to buffer
+	var buf bytes.Buffer
+	var renderErr error
+
+	if rootOptions.quiet {
+		renderer := render.NewD2Renderer(&buf, rootOptions.gridColumns)
+		renderErr = renderer.Render(cluster)
+	} else {
+		spinnerErr := spinner.New().
+			Title("Rendering D2 diagram...").
+			Action(func() {
+				renderer := render.NewD2Renderer(&buf, rootOptions.gridColumns)
+				renderErr = renderer.Render(cluster)
+			}).
+			Run()
+		if spinnerErr != nil {
+			return spinnerErr
+		}
+	}
+	if renderErr != nil {
+		return renderErr
+	}
+
+	// Send to Kroki
+	var svgData []byte
+	var krokiErr error
+	krokiClient := kroki.NewClient()
+
+	if rootOptions.quiet {
+		svgData, krokiErr = krokiClient.GenerateSVG(buf.String())
+	} else {
+		spinnerErr := spinner.New().
+			Title("Generating SVG via Kroki...").
+			Action(func() {
+				svgData, krokiErr = krokiClient.GenerateSVG(buf.String())
+			}).
+			Run()
+		if spinnerErr != nil {
+			return spinnerErr
+		}
+	}
+	if krokiErr != nil {
+		return krokiErr
+	}
+
+	// Write SVG to file
+	if err := os.WriteFile(outputFile, svgData, 0644); err != nil {
+		return err
+	}
+
+	log.Info("SVG image generated successfully", "file", outputFile)
+	return nil
 }

@@ -10,6 +10,7 @@ type RootOptions struct {
 	namespace      string
 	allNamespaces  bool
 	output         string
+	image          string
 	includeStorage bool
 	gridColumns    int
 	showVersion    bool
@@ -34,6 +35,13 @@ func runRoot(cmd *cobra.Command, args []string) error {
 }
 
 func init() {
+	rootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		cmd.Println(err)
+		cmd.Println()
+		_ = cmd.Help()
+		return err
+	})
+
 	rootCmd.Flags().StringVar(&rootOptions.kubeconfig, "kubeconfig", "", "path to kubeconfig (default: ~/.kube/config)")
 	rootCmd.Flags().StringVarP(&rootOptions.namespace, "namespace", "n", "", "namespace to visualize (default: all non-system)")
 	rootCmd.Flags().BoolVarP(&rootOptions.allNamespaces, "all-namespaces", "A", false, "include all namespaces (including system)")
