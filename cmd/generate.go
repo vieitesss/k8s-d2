@@ -19,12 +19,17 @@ import (
 
 // runWithSpinner executes an action with a spinner in normal mode,
 // or directly in quiet mode.
-func runWithSpinner(title string, action func()) error {
+func runWithSpinner(title string, action func() error) error {
 	if rootOptions.quiet {
-		action()
-		return nil
+		return action()
 	}
-	return spinner.New().Title(title).Action(action).Run()
+	var actionErr error
+	if err := spinner.New().Title(title).Action(func() {
+		actionErr = action()
+	}).Run(); err != nil {
+		return err
+	}
+	return actionErr
 }
 
 func runGenerate(cmd *cobra.Command, args []string) error {
@@ -77,26 +82,22 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 func createClientWithSpinner() (*kube.Client, error) {
 	var client *kube.Client
-	var clientErr error
-
-	if err := runWithSpinner("Creating K8s client...", func() {
+	err := runWithSpinner("Creating K8s client...", func() error {
+		var clientErr error
 		client, clientErr = kube.NewClient(rootOptions.kubeconfig)
-	}); err != nil {
-		return nil, err
-	}
-	return client, clientErr
+		return clientErr
+	})
+	return client, err
 }
 
 func fetchTopologyWithSpinner(ctx context.Context, client *kube.Client, opts kube.FetchOptions) (*model.Cluster, error) {
 	var cluster *model.Cluster
-	var fetchErr error
-
-	if err := runWithSpinner("Fetching cluster topology...", func() {
+	err := runWithSpinner("Fetching cluster topology...", func() error {
+		var fetchErr error
 		cluster, fetchErr = client.FetchTopology(ctx, opts)
-	}); err != nil {
-		return nil, err
-	}
-	return cluster, fetchErr
+		return fetchErr
+	})
+	return cluster, err
 }
 
 // getOutputWriter returns the output file to write the diagram to, a cleanup
@@ -116,15 +117,10 @@ func getOutputWriter() (*os.File, func(), error) {
 }
 
 func renderWithSpinner(cluster *model.Cluster, w *os.File) error {
-	var renderErr error
-
-	if err := runWithSpinner("Rendering D2 diagram...", func() {
+	return runWithSpinner("Rendering D2 diagram...", func() error {
 		renderer := render.NewD2Renderer(w, rootOptions.gridColumns)
-		renderErr = renderer.Render(cluster)
-	}); err != nil {
-		return err
-	}
-	return renderErr
+		return renderer.Render(cluster)
+	})
 }
 
 func generateImage(cluster *model.Cluster) error {
@@ -136,30 +132,24 @@ func generateImage(cluster *model.Cluster) error {
 
 	// Render D2 to buffer
 	var buf bytes.Buffer
-	var renderErr error
 
-	if err := runWithSpinner("Rendering D2 diagram...", func() {
+	if err := runWithSpinner("Rendering D2 diagram...", func() error {
 		renderer := render.NewD2Renderer(&buf, rootOptions.gridColumns)
-		renderErr = renderer.Render(cluster)
+		return renderer.Render(cluster)
 	}); err != nil {
 		return err
-	}
-	if renderErr != nil {
-		return renderErr
 	}
 
 	// Send to Kroki
 	var svgData []byte
-	var krokiErr error
 	krokiClient := kroki.NewClient()
 
-	if err := runWithSpinner("Generating SVG via Kroki...", func() {
+	if err := runWithSpinner("Generating SVG via Kroki...", func() error {
+		var krokiErr error
 		svgData, krokiErr = krokiClient.GenerateSVG(buf.String())
+		return krokiErr
 	}); err != nil {
 		return err
-	}
-	if krokiErr != nil {
-		return krokiErr
 	}
 
 	// Write SVG to file
