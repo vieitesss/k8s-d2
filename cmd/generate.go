@@ -1,16 +1,36 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
+	"github.com/vieitesss/k8s-d2/pkg/kroki"
 	"github.com/vieitesss/k8s-d2/pkg/kube"
 	"github.com/vieitesss/k8s-d2/pkg/model"
 	"github.com/vieitesss/k8s-d2/pkg/render"
 )
+
+// runWithSpinner executes an action with a spinner in normal mode,
+// or directly in quiet mode.
+func runWithSpinner(title string, action func() error) error {
+	if rootOptions.quiet {
+		return action()
+	}
+	var actionErr error
+	if err := spinner.New().Title(title).Action(func() {
+		actionErr = action()
+	}).Run(); err != nil {
+		return err
+	}
+	return actionErr
+}
 
 func runGenerate(cmd *cobra.Command, args []string) error {
 	log.SetReportTimestamp(false)
@@ -18,6 +38,11 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	// Configure logger for quiet mode - suppress INFO but keep WARN/ERROR
 	if rootOptions.quiet {
 		log.SetLevel(log.WarnLevel)
+	}
+
+	// Validate mutually exclusive flags
+	if rootOptions.output != "" && rootOptions.image != "" {
+		return errors.New("flags --output/-o and --image/-i are mutually exclusive")
 	}
 
 	client, err := createClientWithSpinner()
@@ -36,6 +61,11 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// If image output is requested, render to buffer and send to Kroki
+	if rootOptions.image != "" {
+		return generateImage(cluster)
+	}
+
 	w, closeWriter, err := getOutputWriter()
 	if err != nil {
 		return err
@@ -52,46 +82,22 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 func createClientWithSpinner() (*kube.Client, error) {
 	var client *kube.Client
-	var clientErr error
-
-	if rootOptions.quiet {
+	err := runWithSpinner("Creating K8s client...", func() error {
+		var clientErr error
 		client, clientErr = kube.NewClient(rootOptions.kubeconfig)
-		return client, clientErr
-	}
-
-	spinnerErr := spinner.New().
-		Title("Creating K8s client...").
-		Action(func() {
-			client, clientErr = kube.NewClient(rootOptions.kubeconfig)
-		}).
-		Run()
-
-	if spinnerErr != nil {
-		return nil, spinnerErr
-	}
-	return client, clientErr
+		return clientErr
+	})
+	return client, err
 }
 
 func fetchTopologyWithSpinner(ctx context.Context, client *kube.Client, opts kube.FetchOptions) (*model.Cluster, error) {
 	var cluster *model.Cluster
-	var fetchErr error
-
-	if rootOptions.quiet {
+	err := runWithSpinner("Fetching cluster topology...", func() error {
+		var fetchErr error
 		cluster, fetchErr = client.FetchTopology(ctx, opts)
-		return cluster, fetchErr
-	}
-
-	spinnerErr := spinner.New().
-		Title("Fetching cluster topology...").
-		Action(func() {
-			cluster, fetchErr = client.FetchTopology(ctx, opts)
-		}).
-		Run()
-
-	if spinnerErr != nil {
-		return nil, spinnerErr
-	}
-	return cluster, fetchErr
+		return fetchErr
+	})
+	return cluster, err
 }
 
 // getOutputWriter returns the output file to write the diagram to, a cleanup
@@ -111,24 +117,46 @@ func getOutputWriter() (*os.File, func(), error) {
 }
 
 func renderWithSpinner(cluster *model.Cluster, w *os.File) error {
-	var renderErr error
-
-	if rootOptions.quiet {
+	return runWithSpinner("Rendering D2 diagram...", func() error {
 		renderer := render.NewD2Renderer(w, rootOptions.gridColumns)
-		renderErr = renderer.Render(cluster)
-		return renderErr
+		return renderer.Render(cluster)
+	})
+}
+
+func generateImage(cluster *model.Cluster) error {
+	// Ensure output file has .svg extension (Kroki only supports SVG for D2)
+	outputFile := rootOptions.image
+	if strings.ToLower(filepath.Ext(outputFile)) != ".svg" {
+		outputFile = strings.TrimSuffix(outputFile, filepath.Ext(outputFile)) + ".svg"
 	}
 
-	spinnerErr := spinner.New().
-		Title("Rendering D2 diagram...").
-		Action(func() {
-			renderer := render.NewD2Renderer(w, rootOptions.gridColumns)
-			renderErr = renderer.Render(cluster)
-		}).
-		Run()
+	// Render D2 to buffer
+	var buf bytes.Buffer
 
-	if spinnerErr != nil {
-		return spinnerErr
+	if err := runWithSpinner("Rendering D2 diagram...", func() error {
+		renderer := render.NewD2Renderer(&buf, rootOptions.gridColumns)
+		return renderer.Render(cluster)
+	}); err != nil {
+		return err
 	}
-	return renderErr
+
+	// Send to Kroki
+	var svgData []byte
+	krokiClient := kroki.NewClient()
+
+	if err := runWithSpinner("Generating SVG via Kroki...", func() error {
+		var krokiErr error
+		svgData, krokiErr = krokiClient.GenerateSVG(buf.String())
+		return krokiErr
+	}); err != nil {
+		return err
+	}
+
+	// Write SVG to file
+	if err := os.WriteFile(outputFile, svgData, 0644); err != nil {
+		return err
+	}
+
+	log.Info("SVG image generated successfully", "file", outputFile)
+	return nil
 }
