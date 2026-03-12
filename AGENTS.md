@@ -21,10 +21,3 @@ This repo is a Go CLI named `k8sdd` that inspects Kubernetes clusters and render
 ## Current Plan
 
 - Active implementation details live in `PLAN.md`.
-
-## References
-
-- Coding patterns: `docs/GO_PATTERNS.md`
-- Testing guidance: `docs/TESTING.md`
-- Git workflow: `docs/GIT_WORKFLOW.md`
-- Development commands: `docs/DEVELOPMENT.md`
