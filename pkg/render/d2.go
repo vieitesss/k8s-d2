@@ -75,7 +75,7 @@ func (r *D2Renderer) renderNamespaceIndented(ns *model.Namespace, indent string)
 	r.writePVCs(&b, ns, indent)
 	r.writeConnections(&b, ns, indent)
 
-	b.WriteString(fmt.Sprintf("%s}\n\n", indent))
+	fmt.Fprintf(&b, "%s}\n\n", indent)
 	if _, err := fmt.Fprint(r.w, b.String()); err != nil {
 		return err
 	}

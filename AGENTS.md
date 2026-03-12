@@ -1,65 +1,23 @@
 # AGENTS.md
 
-CLI tool generating D2 diagrams from Kubernetes cluster topology.
+This repo is a Go CLI named `k8sdd` that inspects Kubernetes clusters and renders D2 topology diagrams.
 
-**Language**: Go 1.24.0  
-**Architecture**: Three-layer (CLI → Data → Render)  
-**Binary**: `k8sdd`
+## Requirements
 
-## Core Stack
+- Keep the work aligned with the current feature or target scope.
+- Use `PLAN.md` in the repo root as the living plan for the current feature or update.
+- `PLAN.md` must stay ignored by git through `.gitignore`.
+- Create or refresh `PLAN.md` before starting work, and update it after every implementation, fix, or scope change.
+- Never push directly to `main`.
+- If the current branch is `main`, create a new branch with a name that summarizes the goal before making changes, then create a detailed `PLAN.md` for that work.
+- Before finishing, run the relevant tests. If new behavior was added and no test covers it yet, add the missing coverage.
+- Pay special attention to validation-related coverage in `internal/validation/`.
 
-- `github.com/spf13/cobra` - CLI framework
-- `k8s.io/client-go` v0.29.0 - Kubernetes API client
-- `github.com/charmbracelet/log` - Structured logging
-- `github.com/charmbracelet/huh/spinner` - Terminal UI spinners
+## Implementation Notes
 
-## Implementation Phases
+- 2026-03-12: Rewrote this file to center the workflow on planning, branch safety, and test verification. The old content described project phases and stack details but did not capture the required `PLAN.md` process.
+- Keep adding short notes here when something was wrong, how it was fixed, or what future implementations should remember.
 
-Current development follows phased approach:
+## Current Plan
 
-- **Phase 1** ✅ Complete: Basic topology (namespaces, workloads, services, configmaps/secrets)
-- **Phase 2** 🚧 In Progress: Storage layer (PVCs, StorageClasses, volume relationships)
-- **Phase 3** 📋 Planned: Network layer (Ingress, NetworkPolicies, pod connections)
-
-When implementing features:
-- Respect phase boundaries
-- Don't jump ahead to phase 3 features
-- Focus on completing current phase fully
-
-## Boundaries
-
-### ✅ ALLOWED WITHOUT ASKING
-
-- Add new K8s resource fetchers following existing patterns
-- Extend model types with new fields
-- Add D2 rendering for new resource types
-- Fix bugs in error handling or output
-- Improve code quality (reduce complexity, better names)
-- Add CLI flags following RootOptions pattern
-- Update dependencies (with justification)
-
-### ❌ REQUIRES DISCUSSION
-
-- Change three-layer architecture
-- Remove existing CLI flags (breaking change)
-- Change D2 output format significantly (breaks user workflows)
-- Add external service dependencies
-- Change license or add CLA
-- Modify build/release process (.goreleaser.yml)
-
-### 🔴 NEVER
-
-- Break client-go v0.29.0 compatibility
-- Remove namespace filtering logic
-- Add telemetry or analytics without explicit opt-in
-- Commit binaries or generated files to git
-- Suppress errors that should be shown to user
-
-## Domain-Specific Guidance
-
-For coding patterns and style, see [docs/GO_PATTERNS.md](docs/GO_PATTERNS.md)  
-For testing procedures, see [docs/TESTING.md](docs/TESTING.md)  
-For Git workflow and PR reviews, see [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md)  
-For development commands, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
-
-For architectural decisions and system design, see [CLAUDE.md](CLAUDE.md)
+- Active implementation details live in `PLAN.md`.
