@@ -73,7 +73,7 @@ When this workflow runs (triggered by a merge to the main branch), you should:
 - **Reference the source**: When updating based on a PR, mention which PR triggered the update in your commit message
 - **Focus on accuracy**: AGENTS.md is guidance for AI coding agents - it must be accurate and current
 - **Check all links**: Ensure all referenced files (like `docs/GO_PATTERNS.md`) actually exist before mentioning them
-- **Note on file protection**: AGENTS.md is in the default protected files list to prevent accidental direct modifications. However, you can still edit it and include it in the PR patch you create via the create-pull-request safe output.
+- **Note on file protection**: AGENTS.md is in the default protected files list, which prevents direct commits to it during workflow execution. However, you can still edit AGENTS.md in your working directory and include it in the PR patch you create via the create-pull-request safe output - the protection doesn't prevent creating PRs with changes to protected files, only direct modifications.
 
 ## What to Track
 
