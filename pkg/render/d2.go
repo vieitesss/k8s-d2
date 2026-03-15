@@ -33,7 +33,7 @@ direction: right
 		return err
 	}
 
-	if err := r.renderLegend(); err != nil {
+	if err := r.renderLegend(cluster); err != nil {
 		return err
 	}
 
@@ -198,52 +198,104 @@ func (r *D2Renderer) writeServiceConnections(b *strings.Builder, svc *model.Serv
 	}
 }
 
-func (r *D2Renderer) renderLegend() error {
-	legend := `
-legend: {
-  label: "LEGEND"
-  grid-rows: 1
-  style.fill: "#fffacd"
-  style.stroke: "#000000"
-  style.stroke-width: 3
-  style.font-size: 16
-  style.bold: true
+func (r *D2Renderer) renderLegend(cluster *model.Cluster) error {
+	entries := legendEntries(cluster)
+	if len(entries) == 0 {
+		return nil
+	}
 
-  deployment: {
-    label: "● Deployment"
-    style.fill: "#f9f9f9"
-  }
+	var b strings.Builder
+	b.WriteString("vars: {\n  d2-legend: {\n")
 
-  statefulset: {
-    label: "◉ StatefulSet"
-    style.fill: "#f9f9f9"
-  }
+	for i, entry := range entries {
+		fmt.Fprintf(&b, "    %s: {\n", entry.id)
+		fmt.Fprintf(&b, "      label: %q\n", entry.label)
+		if entry.fill != "" {
+			fmt.Fprintf(&b, "      style.fill: %q\n", entry.fill)
+		}
+		b.WriteString("    }\n")
+		if i < len(entries)-1 {
+			b.WriteString("\n")
+		}
+	}
 
-  daemonset: {
-    label: "◈ DaemonSet"
-    style.fill: "#f9f9f9"
-  }
+	b.WriteString("  }\n}\n\n")
 
-  service: {
-    label: "⎈ Service"
-    style.fill: "#cce5ff"
-  }
-
-  config: {
-    label: "ConfigMaps | Secrets"
-    style.fill: "#ffffcc"
-  }
-
-  pvc: {
-    label: "💾 PVC"
-    style.fill: "#e6f3ff"
-  }
-}
-`
-	if _, err := fmt.Fprint(r.w, legend); err != nil {
+	if _, err := fmt.Fprint(r.w, b.String()); err != nil {
 		return err
 	}
+
 	return nil
+}
+
+type legendEntry struct {
+	id    string
+	label string
+	fill  string
+}
+
+func legendEntries(cluster *model.Cluster) []legendEntry {
+	var hasDeployments bool
+	var hasStatefulSets bool
+	var hasDaemonSets bool
+	var hasServices bool
+	var hasConfig bool
+	var hasPVCs bool
+
+	for _, ns := range cluster.Namespaces {
+		hasDeployments = hasDeployments || len(ns.Deployments) > 0
+		hasStatefulSets = hasStatefulSets || len(ns.StatefulSets) > 0
+		hasDaemonSets = hasDaemonSets || len(ns.DaemonSets) > 0
+		hasServices = hasServices || len(ns.Services) > 0
+		hasConfig = hasConfig || ns.ConfigMaps > 0 || ns.Secrets > 0
+		hasPVCs = hasPVCs || len(ns.PVCs) > 0
+	}
+
+	entries := make([]legendEntry, 0, 6)
+	if hasDeployments {
+		entries = append(entries, legendEntry{
+			id:    "deployment",
+			label: fmt.Sprintf("%s Deployment", WorkloadIcon("Deployment")),
+			fill:  "#f9f9f9",
+		})
+	}
+	if hasStatefulSets {
+		entries = append(entries, legendEntry{
+			id:    "statefulset",
+			label: fmt.Sprintf("%s StatefulSet", WorkloadIcon("StatefulSet")),
+			fill:  "#f9f9f9",
+		})
+	}
+	if hasDaemonSets {
+		entries = append(entries, legendEntry{
+			id:    "daemonset",
+			label: fmt.Sprintf("%s DaemonSet", WorkloadIcon("DaemonSet")),
+			fill:  "#f9f9f9",
+		})
+	}
+	if hasServices {
+		entries = append(entries, legendEntry{
+			id:    "service",
+			label: "⎈ Service",
+			fill:  "#cce5ff",
+		})
+	}
+	if hasConfig {
+		entries = append(entries, legendEntry{
+			id:    "config",
+			label: "ConfigMaps | Secrets",
+			fill:  "#ffffcc",
+		})
+	}
+	if hasPVCs {
+		entries = append(entries, legendEntry{
+			id:    "pvc",
+			label: "💾 PVC",
+			fill:  "#e6f3ff",
+		})
+	}
+
+	return entries
 }
 
 // SanitizeID converts a Kubernetes resource name to a valid D2 identifier.

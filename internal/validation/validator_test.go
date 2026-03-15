@@ -35,6 +35,12 @@ func TestD2Validator_BasicTopology(t *testing.T) {
 		}
 	})
 
+	t.Run("ValidateLegendStructure", func(t *testing.T) {
+		if err := validator.ValidateLegendStructure(); err != nil {
+			t.Errorf("Legend validation failed: %v", err)
+		}
+	})
+
 	t.Run("ValidateResources", func(t *testing.T) {
 		if err := validator.ValidateResources(); err != nil {
 			t.Errorf("Resource validation failed: %v", err)
@@ -81,6 +87,12 @@ func TestD2Validator_WithStorage(t *testing.T) {
 	t.Run("ValidateSyntax", func(t *testing.T) {
 		if err := validator.ValidateSyntax(); err != nil {
 			t.Errorf("Syntax validation failed: %v", err)
+		}
+	})
+
+	t.Run("ValidateLegendStructure", func(t *testing.T) {
+		if err := validator.ValidateLegendStructure(); err != nil {
+			t.Errorf("Legend validation failed: %v", err)
 		}
 	})
 
