@@ -44,7 +44,7 @@ func (v *D2Validator) ValidateSyntax() error {
 // ValidateLegendStructure checks that the built-in D2 legend exists when needed
 // and only includes entries for rendered resource types.
 func (v *D2Validator) ValidateLegendStructure() error {
-	expectedEntries := v.expectedLegendEntries()
+	expectedEntries := render.LegendEntryIDs(v.expected)
 	if len(expectedEntries) == 0 {
 		if strings.Contains(v.actual, "d2-legend:") {
 			return fmt.Errorf("unexpected legend block for topology without legend entries")
@@ -69,7 +69,7 @@ func (v *D2Validator) ValidateLegendStructure() error {
 		}
 	}
 
-	for _, entry := range allLegendEntryIDs() {
+	for _, entry := range render.AllLegendEntryIDs() {
 		if _, ok := expectedSet[entry]; ok {
 			continue
 		}
@@ -230,51 +230,6 @@ func (v *D2Validator) ValidateConfigInfo() error {
 
 	return nil
 }
-
-func (v *D2Validator) expectedLegendEntries() []string {
-	var hasDeployments bool
-	var hasStatefulSets bool
-	var hasDaemonSets bool
-	var hasServices bool
-	var hasConfig bool
-	var hasPVCs bool
-
-	for _, ns := range v.expected.Namespaces {
-		hasDeployments = hasDeployments || len(ns.Deployments) > 0
-		hasStatefulSets = hasStatefulSets || len(ns.StatefulSets) > 0
-		hasDaemonSets = hasDaemonSets || len(ns.DaemonSets) > 0
-		hasServices = hasServices || len(ns.Services) > 0
-		hasConfig = hasConfig || ns.ConfigMaps > 0 || ns.Secrets > 0
-		hasPVCs = hasPVCs || len(ns.PVCs) > 0
-	}
-
-	entries := make([]string, 0, 6)
-	if hasDeployments {
-		entries = append(entries, "deployment")
-	}
-	if hasStatefulSets {
-		entries = append(entries, "statefulset")
-	}
-	if hasDaemonSets {
-		entries = append(entries, "daemonset")
-	}
-	if hasServices {
-		entries = append(entries, "service")
-	}
-	if hasConfig {
-		entries = append(entries, "config")
-	}
-	if hasPVCs {
-		entries = append(entries, "pvc")
-	}
-
-	return entries
-}
-
-func allLegendEntryIDs() []string {
-	return []string{"deployment", "statefulset", "daemonset", "service", "config", "pvc"}
-}
-
 func extractD2Block(input, marker string) (string, error) {
 	markerIndex := strings.Index(input, marker)
 	if markerIndex == -1 {

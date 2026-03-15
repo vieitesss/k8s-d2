@@ -86,8 +86,13 @@ func TestRenderLegend_IncludesOnlyRenderedResourceTypes(t *testing.T) {
 				return
 			}
 
-			if !strings.Contains(output, "vars: {\n  d2-legend: {") {
-				t.Fatalf("expected built-in legend vars block, output was:\n%s", output)
+			if !strings.Contains(output, "d2-legend:") {
+				t.Fatalf("expected built-in legend block, output was:\n%s", output)
+			}
+
+			varsBlock := extractBlockFromMarker(t, output, "vars:")
+			if !strings.Contains(varsBlock, "d2-legend:") {
+				t.Fatalf("expected legend inside vars block, output was:\n%s", output)
 			}
 
 			legendBlock := extractBlockFromMarker(t, output, "d2-legend:")

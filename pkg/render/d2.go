@@ -234,6 +234,30 @@ type legendEntry struct {
 	fill  string
 }
 
+var allLegendEntryIDs = []string{
+	"deployment",
+	"statefulset",
+	"daemonset",
+	"service",
+	"config",
+	"pvc",
+}
+
+// LegendEntryIDs returns the legend entry IDs that should be rendered for the cluster.
+func LegendEntryIDs(cluster *model.Cluster) []string {
+	entries := legendEntries(cluster)
+	ids := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		ids = append(ids, entry.id)
+	}
+	return ids
+}
+
+// AllLegendEntryIDs returns all supported legend entry IDs.
+func AllLegendEntryIDs() []string {
+	return append([]string(nil), allLegendEntryIDs...)
+}
+
 func legendEntries(cluster *model.Cluster) []legendEntry {
 	var hasDeployments bool
 	var hasStatefulSets bool
