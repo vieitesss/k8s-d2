@@ -59,4 +59,4 @@ jobs:
             --docker-socket /var/run/docker.sock
             --kind-svc tcp://localhost:3000
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
-          version: "v0.19.7"
+          version: "v0.19.10"
