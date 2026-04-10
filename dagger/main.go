@@ -112,7 +112,7 @@ func (m *Dagger) fixtureCluster(
 	kindBinaryCtr := m.build(kindCtr)
 	fixturesDir := m.Src.Directory("test/fixtures")
 
-	kindBinFixCtr, err := ApplyFixtures(ctx, kindBinaryCtr, fixturesDir, true, reuseNamespace)
+	kindBinFixCtr, err := ApplyFixtures(ctx, kindBinaryCtr, fixturesDir, fixtureNamespace, true, reuseNamespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply fixtures: %w", err)
 	}

@@ -15,6 +15,8 @@ It exposes two main functions:
 
 ## Usage
 
+Run these commands from `dagger/`. If you are in the repo root, add `--module ./dagger` to the `dagger` command.
+
 List available functions:
 
 ```bash

@@ -4,4 +4,4 @@
 
 ## Developing Rules
 
-- There is no need to create tests in this Dagger module.
+- Prefer the existing validation flow in this Dagger module; add tests when changing validation behavior.
