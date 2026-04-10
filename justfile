@@ -23,7 +23,7 @@ build:
 run *parameters: build
 	./k8sdd {{parameters}}
 
-generate *parameters:
+generate *parameters: build
 	./k8sdd diagram {{parameters}} -i {{outputImage}}
 	open {{outputImage}}
 
