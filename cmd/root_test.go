@@ -1,6 +1,10 @@
 package cmd
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/spf13/pflag"
+)
 
 func TestRootAndDiagramExposeSameGenerationFlags(t *testing.T) {
 	tests := []struct {
@@ -100,6 +104,28 @@ func TestImageFlagIsAcceptedOnRootAndDiagram(t *testing.T) {
 			}
 			if rootOptions.image != tt.want {
 				t.Fatalf("expected image flag to set %q, got %q", tt.want, rootOptions.image)
+			}
+		})
+	}
+}
+
+func TestNamespaceFlagSupportsMultipleValues(t *testing.T) {
+	tests := []struct {
+		name string
+		cmd  interface{ Flags() *pflag.FlagSet }
+	}{
+		{name: "root", cmd: rootCmd},
+		{name: "diagram", cmd: diagramCmd},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flag := tt.cmd.Flags().Lookup("namespace")
+			if flag == nil {
+				t.Fatalf("expected namespace flag to be registered")
+			}
+			if got := flag.Value.Type(); got != "stringSlice" {
+				t.Fatalf("expected namespace flag type stringSlice, got %q", got)
 			}
 		})
 	}
