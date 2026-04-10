@@ -5,7 +5,6 @@ alias b := build
 alias g := generate
 alias tl := test_local
 
-
 _default:
 	just --list
 
@@ -25,8 +24,7 @@ run *parameters: build
 	./k8sdd {{parameters}}
 
 generate *parameters:
-	just run {{parameters}} -o {{outputFile}}
-	d2 {{outputFile}} {{outputImage}}
+	./k8sdd diagram {{parameters}} -i {{outputImage}}
 	open {{outputImage}}
 
 [working-directory: "dagger"]

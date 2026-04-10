@@ -51,7 +51,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	opts := kube.FetchOptions{
-		Namespace:      rootOptions.namespace,
+		Namespaces:     rootOptions.namespaces,
 		AllNamespaces:  rootOptions.allNamespaces,
 		IncludeStorage: rootOptions.includeStorage,
 	}

@@ -7,7 +7,7 @@ import (
 
 type RootOptions struct {
 	kubeconfig     string
-	namespace      string
+	namespaces     []string
 	allNamespaces  bool
 	output         string
 	image          string
@@ -43,7 +43,7 @@ func init() {
 	})
 
 	rootCmd.PersistentFlags().StringVar(&rootOptions.kubeconfig, "kubeconfig", "", "path to kubeconfig (default: ~/.kube/config)")
-	rootCmd.PersistentFlags().StringVarP(&rootOptions.namespace, "namespace", "n", "", "namespace to visualize (default: all non-system)")
+	rootCmd.PersistentFlags().StringSliceVarP(&rootOptions.namespaces, "namespace", "n", nil, "namespaces to visualize (repeat or comma-separated; default: all non-system)")
 	rootCmd.PersistentFlags().BoolVarP(&rootOptions.allNamespaces, "all-namespaces", "A", false, "include all namespaces (including system)")
 	rootCmd.PersistentFlags().StringVarP(&rootOptions.output, "output", "o", "", "output D2 file (default: stdout)")
 	rootCmd.PersistentFlags().StringVarP(&rootOptions.image, "image", "i", "", "output .svg image file. Extension is not needed always SVG file is generated")

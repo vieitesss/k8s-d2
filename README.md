@@ -83,7 +83,7 @@ k8sdd diagram -i cluster.svg
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--kubeconfig` | | `~/.kube/config` | Path to kubeconfig file |
-| `--namespace` | `-n` | | Filter by specific namespace |
+| `--namespace` | `-n` | | Filter by specific namespaces (repeat or comma-separated) |
 | `--all-namespaces` | `-A` | `false` | Include system namespaces |
 | `--output` | `-o` | stdout | Output D2 file path |
 | `--image` | `-i` | | Output SVG image file (uses Kroki API) |

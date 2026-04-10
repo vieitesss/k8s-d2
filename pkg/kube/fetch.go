@@ -8,11 +8,12 @@ import (
 
 	"github.com/vieitesss/k8s-d2/pkg/model"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type FetchOptions struct {
-	Namespace      string
+	Namespaces     []string
 	AllNamespaces  bool
 	IncludeStorage bool
 }
@@ -40,8 +41,11 @@ func (c *Client) FetchTopology(ctx context.Context, opts FetchOptions) (*model.C
 }
 
 func (c *Client) getNamespaces(ctx context.Context, opts FetchOptions) ([]string, error) {
-	if opts.Namespace != "" {
-		return []string{opts.Namespace}, nil
+	if namespaces := normalizeNamespaceNames(opts.Namespaces); len(namespaces) > 0 {
+		if err := c.validateNamespacesExist(ctx, namespaces); err != nil {
+			return nil, err
+		}
+		return namespaces, nil
 	}
 
 	list, err := c.clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
@@ -50,6 +54,53 @@ func (c *Client) getNamespaces(ctx context.Context, opts FetchOptions) ([]string
 	}
 
 	return c.filterNamespaceNames(list.Items, opts.AllNamespaces), nil
+}
+
+func (c *Client) validateNamespacesExist(ctx context.Context, names []string) error {
+	var missing []string
+
+	for _, name := range names {
+		_, err := c.clientset.CoreV1().Namespaces().Get(ctx, name, metav1.GetOptions{})
+		if err == nil {
+			continue
+		}
+		if apierrors.IsNotFound(err) {
+			missing = append(missing, name)
+			continue
+		}
+		if apierrors.IsForbidden(err) {
+			continue
+		}
+		return err
+	}
+
+	if len(missing) == 1 {
+		return fmt.Errorf("namespace not found: %s", missing[0])
+	}
+	if len(missing) > 1 {
+		return fmt.Errorf("namespaces not found: %s", strings.Join(missing, ", "))
+	}
+
+	return nil
+}
+
+func normalizeNamespaceNames(names []string) []string {
+	seen := make(map[string]struct{}, len(names))
+	var normalized []string
+
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if _, exists := seen[name]; exists {
+			continue
+		}
+		seen[name] = struct{}{}
+		normalized = append(normalized, name)
+	}
+
+	return normalized
 }
 
 func (c *Client) filterNamespaceNames(items []corev1.Namespace, includeSystemNamespaces bool) []string {
@@ -241,7 +292,7 @@ func (c *Client) fetchPVCs(ctx context.Context, nsName string, ns *model.Namespa
 
 func isSystemNamespace(name string) bool {
 	systemPrefixes := []string{"kube-", "openshift-", "istio-"}
-	systemNames := []string{"default", "kube-system", "kube-public", "kube-node-lease", "local-path-storage"}
+	systemNames := []string{"kube-system", "kube-public", "kube-node-lease", "local-path-storage"}
 
 	if slices.Contains(systemNames, name) {
 		return true
