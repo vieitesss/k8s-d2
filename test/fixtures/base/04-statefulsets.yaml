@@ -18,13 +18,8 @@ spec:
         fsGroup: 999
       containers:
       - name: postgres
-        image: postgres:alpine
-        env:
-        - name: POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: db-credentials
-              key: password
+        image: registry.k8s.io/pause:3.10
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5432
         volumeMounts:

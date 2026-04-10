@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: exporter
-        image: busybox:latest
-        command: ['sh', '-c', 'while true; do sleep 3600; done']
+        image: registry.k8s.io/pause:3.10
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9100
