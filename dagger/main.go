@@ -57,7 +57,7 @@ func (m *Dagger) Run(
 	// +optional
 	reuseNamespace bool,
 ) (string, error) {
-	kindCtr, err := m.fixtureCluster(ctx, dockerSocket, kindSvc, kubeconfig, reuseNamespace)
+	kindCtr, err := m.fixtureCluster(ctx, dockerSocket, kindSvc, kubeconfig, reuseNamespace, false)
 	if err != nil {
 		return "", err
 	}
@@ -89,7 +89,7 @@ func (m *Dagger) FixtureImage(
 	// +optional
 	includeStorage bool,
 ) (*dagger.File, error) {
-	kindCtr, err := m.fixtureCluster(ctx, dockerSocket, kindSvc, kubeconfig, reuseNamespace)
+	kindCtr, err := m.fixtureCluster(ctx, dockerSocket, kindSvc, kubeconfig, reuseNamespace, true)
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +103,7 @@ func (m *Dagger) fixtureCluster(
 	kindSvc *dagger.Service,
 	kubeconfig *dagger.Directory,
 	reuseNamespace bool,
+	includeVisual bool,
 ) (*dagger.Container, error) {
 	kindCtr, err := m.kindContainer(ctx, dockerSocket, kindSvc, kubeconfig)
 	if err != nil {
@@ -112,7 +113,7 @@ func (m *Dagger) fixtureCluster(
 	kindBinaryCtr := m.build(kindCtr)
 	fixturesDir := m.Src.Directory("test/fixtures")
 
-	kindBinFixCtr, err := ApplyFixtures(ctx, kindBinaryCtr, fixturesDir, fixtureNamespace, true, reuseNamespace)
+	kindBinFixCtr, err := ApplyFixtures(ctx, kindBinaryCtr, fixturesDir, fixtureNamespace, true, reuseNamespace, includeVisual)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply fixtures: %w", err)
 	}
@@ -213,7 +214,7 @@ func (m *Dagger) runK8sD2(
 	includeStorage bool,
 ) (string, error) {
 	ctr = withOutputDir(ctr)
-	file := ctr.WithExec(k8sddcmd.DiagramArgs(fixtureNamespace, basicOutputFile, includeStorage, false)).File(basicOutputFile)
+	file := ctr.WithExec(k8sddcmd.DiagramArgs(fixtureNamespace, false, basicOutputFile, includeStorage, false)).File(basicOutputFile)
 
 	output, err := file.Contents(ctx)
 	if err != nil {
@@ -236,7 +237,7 @@ func (m *Dagger) runK8sD2Quiet(
 
 	stdoutFile := outputDir + "/stdout.log"
 	stderrFile := outputDir + "/stderr.log"
-	args := append(k8sddcmd.DiagramArgs(fixtureNamespace, quietOutputFile, includeStorage, false), "--quiet")
+	args := append(k8sddcmd.DiagramArgs(fixtureNamespace, false, quietOutputFile, includeStorage, false), "--quiet")
 	cmd := fmt.Sprintf("%s > %s 2> %s", strings.Join(args, " "), stdoutFile, stderrFile)
 
 	execCtr := ctr.WithExec([]string{"sh", "-c", cmd})
@@ -277,7 +278,7 @@ func (m *Dagger) runK8sD2Image(
 ) *dagger.File {
 	ctr = withOutputDir(ctr)
 
-	return ctr.WithExec(k8sddcmd.DiagramArgs(fixtureNamespace, imageOutputFile, includeStorage, true)).File(imageOutputFile)
+	return ctr.WithExec(k8sddcmd.DiagramArgs("", false, imageOutputFile, includeStorage, true)).File(imageOutputFile)
 }
 
 func withOutputDir(ctr *dagger.Container) *dagger.Container {
