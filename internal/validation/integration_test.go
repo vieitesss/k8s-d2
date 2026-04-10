@@ -28,6 +28,10 @@ func TestD2Output_BasicFromEnv(t *testing.T) {
 		t.Errorf("Syntax validation failed: %v", err)
 	}
 
+	if err := validator.ValidateLegendStructure(); err != nil {
+		t.Errorf("Legend validation failed: %v", err)
+	}
+
 	if err := validator.ValidateResources(); err != nil {
 		t.Errorf("Resource validation failed: %v", err)
 	}
@@ -63,6 +67,10 @@ func TestD2Output_StorageFromEnv(t *testing.T) {
 
 	if err := validator.ValidateSyntax(); err != nil {
 		t.Errorf("Syntax validation failed: %v", err)
+	}
+
+	if err := validator.ValidateLegendStructure(); err != nil {
+		t.Errorf("Legend validation failed: %v", err)
 	}
 
 	if err := validator.ValidateResources(); err != nil {
