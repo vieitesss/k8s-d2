@@ -42,17 +42,18 @@ func init() {
 		return err
 	})
 
-	rootCmd.Flags().StringVar(&rootOptions.kubeconfig, "kubeconfig", "", "path to kubeconfig (default: ~/.kube/config)")
-	rootCmd.Flags().StringVarP(&rootOptions.namespace, "namespace", "n", "", "namespace to visualize (default: all non-system)")
-	rootCmd.Flags().BoolVarP(&rootOptions.allNamespaces, "all-namespaces", "A", false, "include all namespaces (including system)")
-	rootCmd.Flags().StringVarP(&rootOptions.output, "output", "o", "", "output file (default: stdout)")
-	rootCmd.Flags().BoolVar(&rootOptions.includeStorage, "include-storage", false, "include PVC/StorageClass layer")
-	rootCmd.Flags().IntVar(&rootOptions.gridColumns, "grid-columns", 3, "deprecated: automatic layout is used")
-	if err := rootCmd.Flags().MarkDeprecated("grid-columns", "automatic layout is now used; this flag has no effect"); err != nil {
+	rootCmd.PersistentFlags().StringVar(&rootOptions.kubeconfig, "kubeconfig", "", "path to kubeconfig (default: ~/.kube/config)")
+	rootCmd.PersistentFlags().StringVarP(&rootOptions.namespace, "namespace", "n", "", "namespace to visualize (default: all non-system)")
+	rootCmd.PersistentFlags().BoolVarP(&rootOptions.allNamespaces, "all-namespaces", "A", false, "include all namespaces (including system)")
+	rootCmd.PersistentFlags().StringVarP(&rootOptions.output, "output", "o", "", "output D2 file (default: stdout)")
+	rootCmd.PersistentFlags().StringVarP(&rootOptions.image, "image", "i", "", "output .svg image file. Extension is not needed always SVG file is generated")
+	rootCmd.PersistentFlags().BoolVar(&rootOptions.includeStorage, "include-storage", false, "include PVC/StorageClass layer")
+	rootCmd.PersistentFlags().IntVar(&rootOptions.gridColumns, "grid-columns", 3, "deprecated: automatic layout is used")
+	if err := rootCmd.PersistentFlags().MarkDeprecated("grid-columns", "automatic layout is now used; this flag has no effect"); err != nil {
 		panic(err)
 	}
 	rootCmd.Flags().BoolVarP(&rootOptions.showVersion, "version", "v", false, "show version information")
-	rootCmd.Flags().BoolVarP(&rootOptions.quiet, "quiet", "q", false, "suppress progress indicators and log messages")
+	rootCmd.PersistentFlags().BoolVarP(&rootOptions.quiet, "quiet", "q", false, "suppress progress indicators and log messages")
 }
 
 func Execute(version string) error {
