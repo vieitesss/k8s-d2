@@ -3,6 +3,7 @@ package render
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -144,7 +145,7 @@ func TestRender_IgnoresDeprecatedGridColumns(t *testing.T) {
 	if !strings.Contains(output, "namespaces: {") {
 		t.Fatalf("expected namespaces container in output, output was:\n%s", output)
 	}
-	if !strings.Contains(output, "  vars: {") {
+	if !strings.Contains(output, fmt.Sprintf("  %s: {", SanitizeID("vars"))) {
 		t.Fatalf("expected namespace to render inside namespaces container, output was:\n%s", output)
 	}
 }
@@ -187,30 +188,30 @@ func TestRender_SortsNamespacesAndResourcesDeterministically(t *testing.T) {
 	output := renderTestCluster(t, cluster)
 
 	assertAppearsInOrder(t, output,
-		"  alpha: {",
-		"  zeta: {",
+		fmt.Sprintf("  %s: {", SanitizeID("alpha")),
+		fmt.Sprintf("  %s: {", SanitizeID("zeta")),
 	)
 
-	alphaBlock := extractBlockFromMarker(t, output, "  alpha:")
+	alphaBlock := extractBlockFromMarker(t, output, fmt.Sprintf("  %s:", SanitizeID("alpha")))
 	assertAppearsInOrder(t, alphaBlock,
-		"  a_api: {",
-		"  z_api: {",
+		fmt.Sprintf("  %s: {", SanitizeID("a-api")),
+		fmt.Sprintf("  %s: {", SanitizeID("z-api")),
 	)
 	assertAppearsInOrder(t, alphaBlock,
-		"  a_db: {",
-		"  z_db: {",
+		fmt.Sprintf("  %s: {", SanitizeID("a-db")),
+		fmt.Sprintf("  %s: {", SanitizeID("z-db")),
 	)
 	assertAppearsInOrder(t, alphaBlock,
-		"  a_agent: {",
-		"  z_agent: {",
+		fmt.Sprintf("  %s: {", SanitizeID("a-agent")),
+		fmt.Sprintf("  %s: {", SanitizeID("z-agent")),
 	)
 	assertAppearsInOrder(t, alphaBlock,
-		"  svc_a_service: {",
-		"  svc_z_service: {",
+		fmt.Sprintf("  %s: {", ServiceID("a-service")),
+		fmt.Sprintf("  %s: {", ServiceID("z-service")),
 	)
 	assertAppearsInOrder(t, alphaBlock,
-		"  pvc_a_data: {",
-		"  pvc_z_data: {",
+		fmt.Sprintf("  %s: {", PVCID("a-data")),
+		fmt.Sprintf("  %s: {", PVCID("z-data")),
 	)
 }
 
@@ -235,11 +236,11 @@ func TestRender_SortsWorkloadPVCConnectionsDeterministically(t *testing.T) {
 	}
 
 	output := renderTestCluster(t, cluster)
-	appsBlock := extractBlockFromMarker(t, output, "  apps:")
+	appsBlock := extractBlockFromMarker(t, output, fmt.Sprintf("  %s:", SanitizeID("apps")))
 
 	assertAppearsInOrder(t, appsBlock,
-		"  web -> pvc_a_data: \"/data (ro)\"",
-		"  web -> pvc_z_cache: \"/cache (rw)\"",
+		fmt.Sprintf("  %s -> %s: %s", SanitizeID("web"), PVCID("a-data"), strconv.Quote("/data (ro)")),
+		fmt.Sprintf("  %s -> %s: %s", SanitizeID("web"), PVCID("z-cache"), strconv.Quote("/cache (rw)")),
 	)
 }
 
@@ -280,6 +281,77 @@ func TestRender_ProducesSameOutputForRepeatedRenders(t *testing.T) {
 
 	if first != second {
 		t.Fatalf("expected repeated renders to match\nfirst:\n%s\nsecond:\n%s", first, second)
+	}
+}
+
+func TestRender_EscapesIdentifiersAndLabels(t *testing.T) {
+	cluster := &model.Cluster{
+		Namespaces: []model.Namespace{{
+			Name: "team.alpha",
+			Deployments: []model.Workload{{
+				Name:     "api.v2",
+				Kind:     "Deployment",
+				Replicas: 3,
+				Labels: map[string]string{
+					"app.kubernetes.io/name": "api.v2",
+				},
+			}},
+			Services: []model.Service{{
+				Name: "api.v2-service",
+				Type: "ClusterIP",
+				Selector: map[string]string{
+					"app.kubernetes.io/name": "api.v2",
+				},
+			}},
+			PVCs: []model.PVC{{
+				Name:         "cache.data",
+				Capacity:     "10Gi",
+				StorageClass: "fast.ssd",
+			}},
+		}},
+	}
+
+	output := renderTestCluster(t, cluster)
+
+	if !strings.Contains(output, fmt.Sprintf("  %s: {", SanitizeID("team.alpha"))) {
+		t.Fatalf("expected escaped namespace identifier, output was:\n%s", output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("label: %s", strconv.Quote("team.alpha"))) {
+		t.Fatalf("expected quoted namespace label, output was:\n%s", output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("  %s: {", ServiceID("api.v2-service"))) {
+		t.Fatalf("expected escaped service identifier, output was:\n%s", output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("  %s: {", PVCID("cache.data"))) {
+		t.Fatalf("expected escaped pvc identifier, output was:\n%s", output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("label: %s", strconv.Quote("● api.v2 (3)"))) {
+		t.Fatalf("expected quoted workload label, output was:\n%s", output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("label: %s", strconv.Quote("⎈ api.v2-service\nClusterIP"))) {
+		t.Fatalf("expected quoted service label with escaped newline, output was:\n%s", output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("label: %s", strconv.Quote("💾 cache.data\n10Gi\n[fast.ssd]"))) {
+		t.Fatalf("expected quoted pvc label with escaped newline, output was:\n%s", output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("%s -> %s", ServiceID("api.v2-service"), SanitizeID("api.v2"))) {
+		t.Fatalf("expected escaped service-to-workload edge, output was:\n%s", output)
+	}
+}
+
+func TestSanitizeID_AvoidsLossyCollisions(t *testing.T) {
+	first := SanitizeID("api-v2")
+	second := SanitizeID("api_v2")
+
+	if first == second {
+		t.Fatalf("expected distinct ids for different Kubernetes names, got %q", first)
+	}
+}
+
+func TestQuoteString_EscapesQuotesAndNewlines(t *testing.T) {
+	input := "name \"quoted\"\nnext"
+	if got, want := QuoteString(input), strconv.Quote(input); got != want {
+		t.Fatalf("QuoteString() = %q, want %q", got, want)
 	}
 }
 

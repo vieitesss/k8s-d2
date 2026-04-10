@@ -1,16 +1,14 @@
 package validation
 
 import (
-	"fmt"
-
 	"github.com/vieitesss/k8s-d2/pkg/model"
 	"github.com/vieitesss/k8s-d2/pkg/render"
 )
 
 // Connection represents a relationship between two resources in the D2 diagram
 type Connection struct {
-	From  string // Source resource ID (e.g., "svc_web_service")
-	To    string // Target resource ID (e.g., "web_frontend")
+	From  string // Source resource ID (e.g., "svc_id_7765622d73657276696365")
+	To    string // Target resource ID (e.g., "id_7765622d66726f6e74656e64")
 	Type  string // Connection type: "service-to-workload" or "workload-to-pvc"
 	Label string // Connection label for mount metadata (e.g., "/var/log (rw)")
 }
@@ -35,12 +33,12 @@ func (rd *RelationshipDeriver) ServiceToWorkloadConnections(ns *model.Namespace)
 	allWorkloads = append(allWorkloads, ns.DaemonSets...)
 
 	for _, svc := range ns.Services {
-		svcID := render.SanitizeID(svc.Name)
+		svcID := render.ServiceID(svc.Name)
 		for _, w := range allWorkloads {
 			if render.LabelsMatch(svc.Selector, w.Labels) {
 				wID := render.SanitizeID(w.Name)
 				connections = append(connections, Connection{
-					From: fmt.Sprintf("svc_%s", svcID),
+					From: svcID,
 					To:   wID,
 					Type: "service-to-workload",
 				})
@@ -71,10 +69,10 @@ func (rd *RelationshipDeriver) WorkloadToPVCConnections(ns *model.Namespace) []C
 		}
 
 		for pvcName, mounts := range mountsByPVC {
-			pvcID := render.SanitizeID(pvcName)
+			pvcID := render.PVCID(pvcName)
 			connections = append(connections, Connection{
 				From:  wID,
-				To:    fmt.Sprintf("pvc_%s", pvcID),
+				To:    pvcID,
 				Type:  "workload-to-pvc",
 				Label: model.FormatMountLabel(mounts),
 			})

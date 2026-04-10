@@ -109,6 +109,68 @@ func TestD2Validator_WithStorage(t *testing.T) {
 	})
 }
 
+func TestD2Validator_EscapedIdentifiersAndLabels(t *testing.T) {
+	cluster := &model.Cluster{
+		Namespaces: []model.Namespace{{
+			Name:       "team.alpha",
+			ConfigMaps: 1,
+			Secrets:    2,
+			Deployments: []model.Workload{{
+				Name:     "api.v2",
+				Kind:     "Deployment",
+				Replicas: 2,
+				Labels: map[string]string{
+					"app.kubernetes.io/name": "api.v2",
+				},
+				VolumeMounts: []model.VolumeMount{{
+					PVCName:   "cache.data",
+					MountPath: "/var/lib/data",
+				}},
+			}},
+			Services: []model.Service{{
+				Name: "api.v2-service",
+				Type: "ClusterIP",
+				Selector: map[string]string{
+					"app.kubernetes.io/name": "api.v2",
+				},
+			}},
+			PVCs: []model.PVC{{
+				Name: "cache.data",
+			}},
+		}},
+	}
+
+	var buf bytes.Buffer
+	renderer := render.NewD2Renderer(&buf, 0)
+	if err := renderer.Render(cluster); err != nil {
+		t.Fatalf("Failed to render D2: %v", err)
+	}
+
+	validator := validation.NewD2Validator(cluster, buf.String())
+
+	if err := validator.ValidateSyntax(); err != nil {
+		t.Fatalf("Syntax validation failed: %v", err)
+	}
+	if err := validator.ValidateLegendStructure(); err != nil {
+		t.Fatalf("Legend validation failed: %v", err)
+	}
+	if err := validator.ValidateResources(); err != nil {
+		t.Fatalf("Resource validation failed: %v", err)
+	}
+	if err := validator.ValidateWorkloadLabels(); err != nil {
+		t.Fatalf("Workload label validation failed: %v", err)
+	}
+	if err := validator.ValidateServiceConnections(); err != nil {
+		t.Fatalf("Service connection validation failed: %v", err)
+	}
+	if err := validator.ValidatePVCConnections(); err != nil {
+		t.Fatalf("PVC connection validation failed: %v", err)
+	}
+	if err := validator.ValidateConfigInfo(); err != nil {
+		t.Fatalf("Config info validation failed: %v", err)
+	}
+}
+
 // Test constants
 const (
 	testNamespace = "k8s-d2-test"
