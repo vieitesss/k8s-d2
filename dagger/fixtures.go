@@ -122,7 +122,7 @@ func ApplyFixtures(
 	for _, readyCheck := range readyChecks {
 		kindContainer, err = kindContainer.WithExec(readyCheck).Sync(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to wait for workload to be ready (%s/%s): %w", readyCheck[3], readyCheck[5], err)
+			return nil, fmt.Errorf("failed to wait for workload to be ready (%s/%s): %w", readyCheck[5], readyCheck[3], err)
 		}
 	}
 
