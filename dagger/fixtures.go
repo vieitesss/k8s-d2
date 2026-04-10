@@ -11,17 +11,21 @@ func ApplyFixtures(
 	ctx context.Context,
 	kindContainer *dagger.Container,
 	fixturesDir *dagger.Directory,
+	namespace string,
 	includeStorage bool,
+	reuseNamespace bool,
 ) (*dagger.Container, error) {
 	var err error
 
-	// Clean up existing namespace to ensure fresh state
-	kindContainer, err = kindContainer.
-		// Delete namespace if it exists (ignore if not found)
-		WithExec([]string{"kubectl", "delete", "namespace", "k8s-d2-test", "--ignore-not-found=true", "--wait=true", "--timeout=60s"}).
-		Sync(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to clean up namespace: %w", err)
+	if !reuseNamespace {
+		// Clean up existing namespace to ensure fresh state.
+		kindContainer, err = kindContainer.
+			// Delete namespace if it exists (ignore if not found).
+			WithExec([]string{"kubectl", "delete", "namespace", namespace, "--ignore-not-found=true", "--wait=true", "--timeout=60s"}).
+			Sync(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to clean up namespace: %w", err)
+		}
 	}
 
 	// Apply base fixtures (sorted by filename to ensure correct order)
@@ -68,12 +72,12 @@ func ApplyFixtures(
 	// This ensures StatefulSets have created all their PVCs
 	kindContainer, err = kindContainer.
 		// Wait for Deployments
-		WithExec([]string{"kubectl", "rollout", "status", "deployment/web-frontend", "-n", "k8s-d2-test", "--timeout=120s"}).
-		WithExec([]string{"kubectl", "rollout", "status", "deployment/api-backend", "-n", "k8s-d2-test", "--timeout=120s"}).
+		WithExec([]string{"kubectl", "rollout", "status", "deployment/web-frontend", "-n", namespace, "--timeout=120s"}).
+		WithExec([]string{"kubectl", "rollout", "status", "deployment/api-backend", "-n", namespace, "--timeout=120s"}).
 		// Wait for StatefulSet (critical for PVC creation)
-		WithExec([]string{"kubectl", "rollout", "status", "statefulset/database", "-n", "k8s-d2-test", "--timeout=120s"}).
+		WithExec([]string{"kubectl", "rollout", "status", "statefulset/database", "-n", namespace, "--timeout=120s"}).
 		// Wait for DaemonSet
-		WithExec([]string{"kubectl", "rollout", "status", "daemonset/log-collector", "-n", "k8s-d2-test", "--timeout=120s"}).
+		WithExec([]string{"kubectl", "rollout", "status", "daemonset/log-collector", "-n", namespace, "--timeout=120s"}).
 		Sync(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for workloads to be ready: %w", err)

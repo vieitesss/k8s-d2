@@ -8,7 +8,19 @@ package main
 import (
 	"context"
 	"dagger/dagger/internal/dagger"
+	"dagger/dagger/k8sddcmd"
 	"fmt"
+	"strings"
+)
+
+const (
+	fixtureNamespace = "k8s-d2-test"
+	outputDir        = "/output"
+	basicOutputFile  = outputDir + "/test.d2"
+	quietOutputFile  = outputDir + "/test-quiet.d2"
+	imageOutputFile  = outputDir + "/test.svg"
+	goModCacheDir    = "/go/pkg/mod"
+	goBuildCacheDir  = "/root/.cache/go-build"
 )
 
 type Dagger struct {
@@ -40,44 +52,100 @@ func (m *Dagger) Run(
 	// Example: `$HOME/.kube`
 	// +optional
 	kubeconfig *dagger.Directory,
-) (string, error) {
-	var kindCtr *dagger.Container
-	var err error
 
-	if kubeconfig != nil {
-		kindCtr, err = m.KindFromService(ctx, kindSvc, kubeconfig)
-	} else {
-		kindCtr = m.KindFromModule(dockerSocket, kindSvc)
-	}
+	// Reuse the existing fixture namespace instead of deleting it first.
+	// +optional
+	reuseNamespace bool,
+) (string, error) {
+	kindCtr, err := m.fixtureCluster(ctx, dockerSocket, kindSvc, kubeconfig, reuseNamespace)
 	if err != nil {
-		return "", fmt.Errorf("failed to create kind container: %w", err)
+		return "", err
 	}
 
 	return m.test(ctx, kindCtr)
 }
 
-func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) (string, error) {
-	kindBinaryCtr := m.build(kindCtr)
+// FixtureImage returns the SVG generated from the fixture-backed kind cluster.
+func (m *Dagger) FixtureImage(
+	ctx context.Context,
 
-	fixturesDir := m.Src.Directory("test/fixtures")
+	// Docker socket path
+	dockerSocket *dagger.Socket,
 
-	kindBinFixCtr, err := ApplyFixtures(ctx, kindBinaryCtr, fixturesDir, true)
+	// Your already created Kind cluster address.
+	// Example: `tcp://localhost:3000`
+	kindSvc *dagger.Service,
+
+	// Directory containing kubeconfig files for your cluster.
+	// Example: `$HOME/.kube`
+	// +optional
+	kubeconfig *dagger.Directory,
+
+	// Reuse the existing fixture namespace instead of deleting it first.
+	// +optional
+	reuseNamespace bool,
+
+	// Include the storage layer in the generated diagram.
+	// +optional
+	includeStorage bool,
+) (*dagger.File, error) {
+	kindCtr, err := m.fixtureCluster(ctx, dockerSocket, kindSvc, kubeconfig, reuseNamespace)
 	if err != nil {
-		return "", fmt.Errorf("failed to apply fixtures: %w", err)
+		return nil, err
 	}
 
+	return m.runK8sD2Image(kindCtr, includeStorage), nil
+}
+
+func (m *Dagger) fixtureCluster(
+	ctx context.Context,
+	dockerSocket *dagger.Socket,
+	kindSvc *dagger.Service,
+	kubeconfig *dagger.Directory,
+	reuseNamespace bool,
+) (*dagger.Container, error) {
+	kindCtr, err := m.kindContainer(ctx, dockerSocket, kindSvc, kubeconfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kind container: %w", err)
+	}
+
+	kindBinaryCtr := m.build(kindCtr)
+	fixturesDir := m.Src.Directory("test/fixtures")
+
+	kindBinFixCtr, err := ApplyFixtures(ctx, kindBinaryCtr, fixturesDir, fixtureNamespace, true, reuseNamespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply fixtures: %w", err)
+	}
+
+	return kindBinFixCtr, nil
+}
+
+func (m *Dagger) kindContainer(
+	ctx context.Context,
+	dockerSocket *dagger.Socket,
+	kindSvc *dagger.Service,
+	kubeconfig *dagger.Directory,
+) (*dagger.Container, error) {
+	if kubeconfig != nil {
+		return m.KindFromService(ctx, kindSvc, kubeconfig)
+	}
+
+	return m.KindFromModule(dockerSocket, kindSvc), nil
+}
+
+func (m *Dagger) test(ctx context.Context, kindCtr *dagger.Container) (string, error) {
 	// Generate D2 outputs from real cluster
-	basicOutput, err := m.runK8sD2(ctx, kindBinFixCtr, false)
+	basicOutput, err := m.runK8sD2(ctx, kindCtr, false)
 	if err != nil {
 		return "", fmt.Errorf("k8s-d2 execution failed (basic): %w", err)
 	}
 
-	storageOutput, err := m.runK8sD2(ctx, kindBinFixCtr, true)
+	storageOutput, err := m.runK8sD2(ctx, kindCtr, true)
 	if err != nil {
 		return "", fmt.Errorf("k8s-d2 execution failed (storage): %w", err)
 	}
 
-	quietOutput, err := m.runK8sD2Quiet(ctx, kindBinFixCtr, false)
+	quietOutput, err := m.runK8sD2Quiet(ctx, kindCtr, false)
 	if err != nil {
 		return "", fmt.Errorf("k8s-d2 execution failed (quiet mode): %w", err)
 	}
@@ -96,8 +164,10 @@ func (m *Dagger) BaseContainer() *dagger.Container {
 		From("golang:1.24").
 		WithDirectory("/src", m.Src).
 		WithWorkdir("/src").
-		WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod")).
-		WithMountedCache("/root/.cache/go-build", dag.CacheVolume("go-build"))
+		WithEnvVariable("GOMODCACHE", goModCacheDir).
+		WithEnvVariable("GOCACHE", goBuildCacheDir).
+		WithMountedCache(goModCacheDir, dag.CacheVolume("go-mod")).
+		WithMountedCache(goBuildCacheDir, dag.CacheVolume("go-build"))
 }
 
 // runValidationTests runs Go tests to validate D2 outputs
@@ -142,17 +212,8 @@ func (m *Dagger) runK8sD2(
 
 	includeStorage bool,
 ) (string, error) {
-	ctr = ctr.
-		WithExec([]string{"mkdir", "-p", "/output"}).
-		WithWorkdir("/output")
-
-	outputFile := "/output/test.d2"
-	args := []string{"k8sdd", "diagram", "-n", "k8s-d2-test", "-o", outputFile}
-	if includeStorage {
-		args = []string{"k8sdd", "diagram", "-n", "k8s-d2-test", "--include-storage", "-o", outputFile}
-	}
-
-	file := ctr.WithExec(args).File(outputFile)
+	ctr = withOutputDir(ctr)
+	file := ctr.WithExec(k8sddcmd.DiagramArgs(fixtureNamespace, basicOutputFile, includeStorage, false)).File(basicOutputFile)
 
 	output, err := file.Contents(ctx)
 	if err != nil {
@@ -171,24 +232,14 @@ func (m *Dagger) runK8sD2Quiet(
 
 	includeStorage bool,
 ) (string, error) {
-	ctr = ctr.
-		WithExec([]string{"mkdir", "-p", "/output"}).
-		WithWorkdir("/output")
+	ctr = withOutputDir(ctr)
 
-	outputFile := "/output/test-quiet.d2"
-	stdoutFile := "/output/stdout.log"
-	stderrFile := "/output/stderr.log"
-	args := []string{"sh", "-c"}
+	stdoutFile := outputDir + "/stdout.log"
+	stderrFile := outputDir + "/stderr.log"
+	args := append(k8sddcmd.DiagramArgs(fixtureNamespace, quietOutputFile, includeStorage, false), "--quiet")
+	cmd := fmt.Sprintf("%s > %s 2> %s", strings.Join(args, " "), stdoutFile, stderrFile)
 
-	var cmd string
-	if includeStorage {
-		cmd = fmt.Sprintf("k8sdd diagram -n k8s-d2-test --include-storage -o %s --quiet > %s 2> %s", outputFile, stdoutFile, stderrFile)
-	} else {
-		cmd = fmt.Sprintf("k8sdd diagram -n k8s-d2-test -o %s --quiet > %s 2> %s", outputFile, stdoutFile, stderrFile)
-	}
-	args = append(args, cmd)
-
-	execCtr := ctr.WithExec(args)
+	execCtr := ctr.WithExec([]string{"sh", "-c", cmd})
 
 	// Check stdout for unwanted output.
 	stdout, err := execCtr.File(stdoutFile).Contents(ctx)
@@ -200,11 +251,37 @@ func (m *Dagger) runK8sD2Quiet(
 		return "", fmt.Errorf("quiet mode test failed: stdout should be empty but contains: %s", stdout)
 	}
 
+	// Check stderr for unwanted output.
+	stderr, err := execCtr.File(stderrFile).Contents(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to read stderr: %w", err)
+	}
+
+	if stderr != "" {
+		return "", fmt.Errorf("quiet mode test failed: stderr should be empty but contains: %s", stderr)
+	}
+
 	// Get the D2 output
-	output, err := execCtr.File(outputFile).Contents(ctx)
+	output, err := execCtr.File(quietOutputFile).Contents(ctx)
 	if err != nil {
 		return "", err
 	}
 
 	return output, nil
+}
+
+// runK8sD2Image executes k8sdd against the cluster and returns the SVG artifact.
+func (m *Dagger) runK8sD2Image(
+	ctr *dagger.Container,
+	includeStorage bool,
+) *dagger.File {
+	ctr = withOutputDir(ctr)
+
+	return ctr.WithExec(k8sddcmd.DiagramArgs(fixtureNamespace, imageOutputFile, includeStorage, true)).File(imageOutputFile)
+}
+
+func withOutputDir(ctr *dagger.Container) *dagger.Container {
+	return ctr.
+		WithExec([]string{"mkdir", "-p", outputDir}).
+		WithWorkdir(outputDir)
 }
