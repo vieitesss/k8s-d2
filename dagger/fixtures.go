@@ -18,7 +18,7 @@ func ApplyFixtures(
 	// Clean up existing namespace to ensure fresh state
 	kindContainer, err = kindContainer.
 		// Delete namespace if it exists (ignore if not found)
-		WithExec([]string{"kubectl", "delete", "namespace", "k8s-d2-test", "--ignore-not-found=true", "--wait=true", "--timeout=60s"}).
+		WithExec([]string{"kubectl", "delete", "namespace", fixtureNamespace, "--ignore-not-found=true", "--wait=true", "--timeout=60s"}).
 		Sync(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to clean up namespace: %w", err)
@@ -68,12 +68,12 @@ func ApplyFixtures(
 	// This ensures StatefulSets have created all their PVCs
 	kindContainer, err = kindContainer.
 		// Wait for Deployments
-		WithExec([]string{"kubectl", "rollout", "status", "deployment/web-frontend", "-n", "k8s-d2-test", "--timeout=120s"}).
-		WithExec([]string{"kubectl", "rollout", "status", "deployment/api-backend", "-n", "k8s-d2-test", "--timeout=120s"}).
+		WithExec([]string{"kubectl", "rollout", "status", "deployment/web-frontend", "-n", fixtureNamespace, "--timeout=120s"}).
+		WithExec([]string{"kubectl", "rollout", "status", "deployment/api-backend", "-n", fixtureNamespace, "--timeout=120s"}).
 		// Wait for StatefulSet (critical for PVC creation)
-		WithExec([]string{"kubectl", "rollout", "status", "statefulset/database", "-n", "k8s-d2-test", "--timeout=120s"}).
+		WithExec([]string{"kubectl", "rollout", "status", "statefulset/database", "-n", fixtureNamespace, "--timeout=120s"}).
 		// Wait for DaemonSet
-		WithExec([]string{"kubectl", "rollout", "status", "daemonset/log-collector", "-n", "k8s-d2-test", "--timeout=120s"}).
+		WithExec([]string{"kubectl", "rollout", "status", "daemonset/log-collector", "-n", fixtureNamespace, "--timeout=120s"}).
 		Sync(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for workloads to be ready: %w", err)

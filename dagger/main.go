@@ -238,6 +238,16 @@ func (m *Dagger) runK8sD2Quiet(
 		return "", fmt.Errorf("quiet mode test failed: stdout should be empty but contains: %s", stdout)
 	}
 
+	// Check stderr for unwanted output.
+	stderr, err := execCtr.File(stderrFile).Contents(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to read stderr: %w", err)
+	}
+
+	if stderr != "" {
+		return "", fmt.Errorf("quiet mode test failed: stderr should be empty but contains: %s", stderr)
+	}
+
 	// Get the D2 output
 	output, err := execCtr.File(quietOutputFile).Contents(ctx)
 	if err != nil {

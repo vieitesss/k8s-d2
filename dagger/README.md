@@ -72,7 +72,7 @@ The `validate`, `image`, and `image-storage` recipes automatically resolve the A
 Defaults are hardcoded for local use:
 
 - Docker socket: `/var/run/docker.sock`
-- Kubeconfig: `file:///Users/vieitesprefapp/.kube`
+- Kubeconfig: `file://$HOME/.kube`
 
 The only optional parameter is the output filename:
 

@@ -3,7 +3,7 @@ cluster_config := "../test/fixtures/kind-config.yaml"
 control_plane_container := cluster_name + "-control-plane"
 
 docker_socket := "/var/run/docker.sock"
-kubeconfig := "file:///Users/vieitesprefapp/.kube"
+kubeconfig := "file://" + env_var('HOME') + "/.kube"
 
 _default:
 	just --list
