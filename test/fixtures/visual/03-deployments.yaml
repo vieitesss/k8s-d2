@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+      component: ui
+  template:
+    metadata:
+      labels:
+        app: grafana
+        component: ui
+    spec:
+      containers:
+      - name: grafana
+        image: busybox:latest
+        command: ['sh', '-c', 'while true; do sleep 3600; done']
+        ports:
+        - containerPort: 3000
+        volumeMounts:
+        - name: grafana-storage
+          mountPath: /var/lib/grafana
+      volumes:
+      - name: grafana-storage
+        persistentVolumeClaim:
+          claimName: grafana-storage

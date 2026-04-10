@@ -241,7 +241,7 @@ func (c *Client) fetchPVCs(ctx context.Context, nsName string, ns *model.Namespa
 
 func isSystemNamespace(name string) bool {
 	systemPrefixes := []string{"kube-", "openshift-", "istio-"}
-	systemNames := []string{"default", "kube-system", "kube-public", "kube-node-lease"}
+	systemNames := []string{"default", "kube-system", "kube-public", "kube-node-lease", "local-path-storage"}
 
 	if slices.Contains(systemNames, name) {
 		return true
