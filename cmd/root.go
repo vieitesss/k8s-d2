@@ -47,7 +47,10 @@ func init() {
 	rootCmd.Flags().BoolVarP(&rootOptions.allNamespaces, "all-namespaces", "A", false, "include all namespaces (including system)")
 	rootCmd.Flags().StringVarP(&rootOptions.output, "output", "o", "", "output file (default: stdout)")
 	rootCmd.Flags().BoolVar(&rootOptions.includeStorage, "include-storage", false, "include PVC/StorageClass layer")
-	rootCmd.Flags().IntVar(&rootOptions.gridColumns, "grid-columns", 3, "number of columns in grid layout (0 for single column)")
+	rootCmd.Flags().IntVar(&rootOptions.gridColumns, "grid-columns", 3, "deprecated: automatic layout is used")
+	if err := rootCmd.Flags().MarkDeprecated("grid-columns", "automatic layout is now used; this flag has no effect"); err != nil {
+		panic(err)
+	}
 	rootCmd.Flags().BoolVarP(&rootOptions.showVersion, "version", "v", false, "show version information")
 	rootCmd.Flags().BoolVarP(&rootOptions.quiet, "quiet", "q", false, "suppress progress indicators and log messages")
 }
