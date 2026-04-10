@@ -1,0 +1,46 @@
+cluster_name := "kind"
+cluster_config := "../test/fixtures/kind-config.yaml"
+control_plane_container := cluster_name + "-control-plane"
+
+docker_socket := "/var/run/docker.sock"
+kubeconfig := "file://" + env_var('HOME') + "/.kube"
+
+_default:
+	just --list
+
+cluster:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	if kind get clusters | grep -qx '{{cluster_name}}'; then
+	  echo "kind cluster '{{cluster_name}}' already exists"
+	else
+	  kind create cluster --name '{{cluster_name}}' --config '{{cluster_config}}'
+	fi
+
+_cluster_port:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	docker port '{{control_plane_container}}' 6443/tcp | awk -F: 'NR == 1 { print $NF; exit }'
+
+validate: cluster
+	#!/usr/bin/env bash
+	set -euo pipefail
+	port="$(just --quiet _cluster_port)"
+	args=(dagger call run --docker-socket '{{docker_socket}}' --kind-svc "tcp://localhost:${port}" --kubeconfig '{{kubeconfig}}')
+	"${args[@]}"
+
+image output='cluster.svg': cluster
+	#!/usr/bin/env bash
+	set -euo pipefail
+	port="$(just --quiet _cluster_port)"
+	args=(dagger call fixture-image --docker-socket '{{docker_socket}}' --kind-svc "tcp://localhost:${port}" --kubeconfig '{{kubeconfig}}' --reuse-namespace)
+	args+=(export --path '{{output}}')
+	"${args[@]}"
+
+image-storage output='cluster-with-storage.svg': cluster
+	#!/usr/bin/env bash
+	set -euo pipefail
+	port="$(just --quiet _cluster_port)"
+	args=(dagger call fixture-image --docker-socket '{{docker_socket}}' --kind-svc "tcp://localhost:${port}" --kubeconfig '{{kubeconfig}}' --include-storage --reuse-namespace)
+	args+=(export --path '{{output}}')
+	"${args[@]}"

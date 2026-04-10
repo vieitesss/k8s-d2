@@ -1,0 +1,97 @@
+# k8sdd Dagger Module
+
+This module runs `k8sdd` against a dummy kind cluster populated from `test/fixtures/`.
+
+It exposes two main functions:
+
+- `run`: applies the fixtures and validates the generated D2 output.
+- `fixture-image`: applies the fixtures and exports the final SVG image.
+
+## Requirements
+
+- `dagger` CLI
+- Docker socket access, usually `/var/run/docker.sock`
+- A reachable kind service address, for example `tcp://localhost:3000`
+
+## Usage
+
+Run these commands from `dagger/`. If you are in the repo root, add `--module ./dagger` to the `dagger` command.
+
+List available functions:
+
+```bash
+dagger functions
+```
+
+Run the validation flow:
+
+```bash
+dagger call run \
+  --docker-socket /var/run/docker.sock \
+  --kind-svc tcp://localhost:3000
+```
+
+Reuse an existing fixture namespace instead of deleting and recreating it:
+
+```bash
+dagger call run \
+  --docker-socket /var/run/docker.sock \
+  --kind-svc tcp://localhost:3000 \
+  --reuse-namespace
+```
+
+Export the fixture-backed SVG image:
+
+```bash
+dagger call fixture-image \
+  --docker-socket /var/run/docker.sock \
+  --kind-svc tcp://localhost:3000 \
+  export --path ./cluster.svg
+```
+
+Export the SVG with storage resources included:
+
+```bash
+dagger call fixture-image \
+  --docker-socket /var/run/docker.sock \
+  --kind-svc tcp://localhost:3000 \
+  --include-storage \
+  export --path ./cluster-with-storage.svg
+```
+
+If you want to connect through an existing kubeconfig directory, add:
+
+```bash
+--kubeconfig file://$HOME/.kube
+```
+
+Both `run` and `fixture-image` also accept `--reuse-namespace` when you want to keep working against an already created `k8s-d2-test` namespace.
+
+## Just Recipes
+
+From `dagger/`:
+
+```bash
+just --list
+just cluster
+just validate
+just image
+just image-storage
+```
+
+The `cluster` recipe ensures a local kind cluster named `kind` exists.
+The `validate`, `image`, and `image-storage` recipes automatically resolve the API server port from that cluster.
+
+Defaults are hardcoded for local use:
+
+- Docker socket: `/var/run/docker.sock`
+- Kubeconfig: `file://$HOME/.kube`
+
+The only optional parameter is the output filename:
+
+```bash
+just image
+just image custom.svg
+just image-storage
+just image-storage custom-storage.svg
+```
