@@ -12,16 +12,19 @@ func ApplyFixtures(
 	kindContainer *dagger.Container,
 	fixturesDir *dagger.Directory,
 	includeStorage bool,
+	reuseNamespace bool,
 ) (*dagger.Container, error) {
 	var err error
 
-	// Clean up existing namespace to ensure fresh state
-	kindContainer, err = kindContainer.
-		// Delete namespace if it exists (ignore if not found)
-		WithExec([]string{"kubectl", "delete", "namespace", fixtureNamespace, "--ignore-not-found=true", "--wait=true", "--timeout=60s"}).
-		Sync(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to clean up namespace: %w", err)
+	if !reuseNamespace {
+		// Clean up existing namespace to ensure fresh state.
+		kindContainer, err = kindContainer.
+			// Delete namespace if it exists (ignore if not found).
+			WithExec([]string{"kubectl", "delete", "namespace", fixtureNamespace, "--ignore-not-found=true", "--wait=true", "--timeout=60s"}).
+			Sync(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to clean up namespace: %w", err)
+		}
 	}
 
 	// Apply base fixtures (sorted by filename to ensure correct order)

@@ -29,6 +29,15 @@ dagger call run \
   --kind-svc tcp://localhost:3000
 ```
 
+Reuse an existing fixture namespace instead of deleting and recreating it:
+
+```bash
+dagger call run \
+  --docker-socket /var/run/docker.sock \
+  --kind-svc tcp://localhost:3000 \
+  --reuse-namespace
+```
+
 Export the fixture-backed SVG image:
 
 ```bash
@@ -53,6 +62,8 @@ If you want to connect through an existing kubeconfig directory, add:
 ```bash
 --kubeconfig file://$HOME/.kube
 ```
+
+Both `run` and `fixture-image` also accept `--reuse-namespace` when you want to keep working against an already created `k8s-d2-test` namespace.
 
 ## Just Recipes
 

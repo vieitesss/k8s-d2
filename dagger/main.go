@@ -19,6 +19,8 @@ const (
 	basicOutputFile  = outputDir + "/test.d2"
 	quietOutputFile  = outputDir + "/test-quiet.d2"
 	imageOutputFile  = outputDir + "/test.svg"
+	goModCacheDir    = "/go/pkg/mod"
+	goBuildCacheDir  = "/root/.cache/go-build"
 )
 
 type Dagger struct {
@@ -50,8 +52,12 @@ func (m *Dagger) Run(
 	// Example: `$HOME/.kube`
 	// +optional
 	kubeconfig *dagger.Directory,
+
+	// Reuse the existing fixture namespace instead of deleting it first.
+	// +optional
+	reuseNamespace bool,
 ) (string, error) {
-	kindCtr, err := m.fixtureCluster(ctx, dockerSocket, kindSvc, kubeconfig)
+	kindCtr, err := m.fixtureCluster(ctx, dockerSocket, kindSvc, kubeconfig, reuseNamespace)
 	if err != nil {
 		return "", err
 	}
@@ -75,11 +81,15 @@ func (m *Dagger) FixtureImage(
 	// +optional
 	kubeconfig *dagger.Directory,
 
+	// Reuse the existing fixture namespace instead of deleting it first.
+	// +optional
+	reuseNamespace bool,
+
 	// Include the storage layer in the generated diagram.
 	// +optional
 	includeStorage bool,
 ) (*dagger.File, error) {
-	kindCtr, err := m.fixtureCluster(ctx, dockerSocket, kindSvc, kubeconfig)
+	kindCtr, err := m.fixtureCluster(ctx, dockerSocket, kindSvc, kubeconfig, reuseNamespace)
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +102,7 @@ func (m *Dagger) fixtureCluster(
 	dockerSocket *dagger.Socket,
 	kindSvc *dagger.Service,
 	kubeconfig *dagger.Directory,
+	reuseNamespace bool,
 ) (*dagger.Container, error) {
 	kindCtr, err := m.kindContainer(ctx, dockerSocket, kindSvc, kubeconfig)
 	if err != nil {
@@ -101,7 +112,7 @@ func (m *Dagger) fixtureCluster(
 	kindBinaryCtr := m.build(kindCtr)
 	fixturesDir := m.Src.Directory("test/fixtures")
 
-	kindBinFixCtr, err := ApplyFixtures(ctx, kindBinaryCtr, fixturesDir, true)
+	kindBinFixCtr, err := ApplyFixtures(ctx, kindBinaryCtr, fixturesDir, true, reuseNamespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply fixtures: %w", err)
 	}
@@ -153,8 +164,10 @@ func (m *Dagger) BaseContainer() *dagger.Container {
 		From("golang:1.24").
 		WithDirectory("/src", m.Src).
 		WithWorkdir("/src").
-		WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod")).
-		WithMountedCache("/root/.cache/go-build", dag.CacheVolume("go-build"))
+		WithEnvVariable("GOMODCACHE", goModCacheDir).
+		WithEnvVariable("GOCACHE", goBuildCacheDir).
+		WithMountedCache(goModCacheDir, dag.CacheVolume("go-mod")).
+		WithMountedCache(goBuildCacheDir, dag.CacheVolume("go-build"))
 }
 
 // runValidationTests runs Go tests to validate D2 outputs

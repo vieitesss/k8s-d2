@@ -33,7 +33,7 @@ image output='cluster.svg': cluster
 	#!/usr/bin/env bash
 	set -euo pipefail
 	port="$(just --quiet _cluster_port)"
-	args=(dagger call fixture-image --docker-socket '{{docker_socket}}' --kind-svc "tcp://localhost:${port}" --kubeconfig '{{kubeconfig}}')
+	args=(dagger call fixture-image --docker-socket '{{docker_socket}}' --kind-svc "tcp://localhost:${port}" --kubeconfig '{{kubeconfig}}' --reuse-namespace)
 	args+=(export --path '{{output}}')
 	"${args[@]}"
 
@@ -41,6 +41,6 @@ image-storage output='cluster-with-storage.svg': cluster
 	#!/usr/bin/env bash
 	set -euo pipefail
 	port="$(just --quiet _cluster_port)"
-	args=(dagger call fixture-image --docker-socket '{{docker_socket}}' --kind-svc "tcp://localhost:${port}" --kubeconfig '{{kubeconfig}}' --include-storage)
+	args=(dagger call fixture-image --docker-socket '{{docker_socket}}' --kind-svc "tcp://localhost:${port}" --kubeconfig '{{kubeconfig}}' --include-storage --reuse-namespace)
 	args+=(export --path '{{output}}')
 	"${args[@]}"
