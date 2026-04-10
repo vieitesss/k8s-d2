@@ -9,14 +9,15 @@ import (
 )
 
 type D2Renderer struct {
-	w           io.Writer
-	gridColumns int
+	w io.Writer
 }
 
+// NewD2Renderer constructs a D2 renderer.
+// gridColumns is deprecated and ignored; D2 now uses automatic layout.
 func NewD2Renderer(w io.Writer, gridColumns int) *D2Renderer {
+	_ = gridColumns
 	return &D2Renderer{
-		w:           w,
-		gridColumns: gridColumns,
+		w: w,
 	}
 }
 
@@ -37,24 +38,22 @@ direction: right
 		return err
 	}
 
-	if r.gridColumns > 0 {
-		if _, err := fmt.Fprintf(r.w, "namespaces: {\n  grid-columns: %d\n\n", r.gridColumns); err != nil {
+	if len(cluster.Namespaces) == 0 {
+		return nil
+	}
+
+	if _, err := fmt.Fprint(r.w, "namespaces: {\n\n"); err != nil {
+		return err
+	}
+
+	for _, ns := range cluster.Namespaces {
+		if err := r.renderNamespaceIndented(&ns, "  "); err != nil {
 			return err
 		}
-		for _, ns := range cluster.Namespaces {
-			if err := r.renderNamespaceIndented(&ns, "  "); err != nil {
-				return err
-			}
-		}
-		if _, err := fmt.Fprint(r.w, "}\n"); err != nil {
-			return err
-		}
-	} else {
-		for _, ns := range cluster.Namespaces {
-			if err := r.renderNamespaceIndented(&ns, ""); err != nil {
-				return err
-			}
-		}
+	}
+
+	if _, err := fmt.Fprint(r.w, "}\n"); err != nil {
+		return err
 	}
 
 	return nil
@@ -66,7 +65,6 @@ func (r *D2Renderer) renderNamespaceIndented(ns *model.Namespace, indent string)
 
 	fmt.Fprintf(&b, "%s%s: {\n", indent, nsID)
 	fmt.Fprintf(&b, "%s  label: %s\n", indent, ns.Name)
-	fmt.Fprintf(&b, "%s  grid-columns: 3\n", indent)
 	fmt.Fprintf(&b, "%s  style.fill: \"#f0f0f0\"\n\n", indent)
 
 	r.writeAllWorkloads(&b, ns, indent)

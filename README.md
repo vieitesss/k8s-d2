@@ -21,7 +21,7 @@ A command-line tool that generates [D2](https://d2lang.com/) diagram files from 
 - Map service-to-workload relationships
 - Filter by namespace or view entire cluster
 - Track ConfigMaps and Secrets per namespace
-- Customizable grid layout for namespace organization
+- Use D2 automatic layout for cleaner topology diagrams
 - Output to file or stdout for pipeline integration
 - Generate SVG images directly via [Kroki](https://kroki.io/) API (no local D2 installation required)
 
@@ -111,15 +111,11 @@ k8sdd diagram --all-namespaces -o full-cluster.d2
 k8sdd diagram --kubeconfig ~/.kube/prod-config -o prod.d2
 ```
 
-### Layout Options
+### Layout
 
-```bash
-# Control namespace grid layout (default: 3 columns)
-k8sdd diagram --grid-columns 2 -o wide-layout.d2
+Diagrams use D2's automatic layout so namespaces and resources can be positioned without forced grid constraints.
 
-# Single column layout
-k8sdd diagram --grid-columns 1 -o vertical.d2
-```
+> `--grid-columns` is deprecated and has no effect.
 
 ### Advanced Usage
 
@@ -128,7 +124,7 @@ k8sdd diagram --grid-columns 1 -o vertical.d2
 k8sdd diagram --include-storage -o storage.d2
 
 # Combine options
-k8sdd diagram --all-namespaces --include-storage --grid-columns 4 -o complete.d2
+k8sdd diagram --all-namespaces --include-storage -o complete.d2
 
 # Generate SVG with storage layer
 k8sdd diagram --include-storage -i cluster-with-storage.svg
@@ -146,7 +142,6 @@ k8sdd diagram -q -o cluster.d2
 | `--all-namespaces` | `-A` | `false` | Include system namespaces |
 | `--output` | `-o` | stdout | Output D2 file path |
 | `--image` | `-i` | | Output SVG image file (uses Kroki API) |
-| `--grid-columns` | | `3` | Number of columns for namespace layout |
 | `--include-storage` | | `false` | Include PVCs and StorageClasses |
 | `--quiet` | `-q` | `false` | Suppress progress indicators and log messages |
 
