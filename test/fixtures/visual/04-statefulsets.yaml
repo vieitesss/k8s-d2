@@ -1,41 +1,6 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: redis-cache
-  namespace: payments
-spec:
-  serviceName: redis
-  replicas: 1
-  selector:
-    matchLabels:
-      app: redis
-  template:
-    metadata:
-      labels:
-        app: redis
-    spec:
-      containers:
-      - name: redis
-        image: redis:alpine
-        ports:
-        - containerPort: 6379
-        volumeMounts:
-        - name: data
-          mountPath: /data
-  volumeClaimTemplates:
-  - metadata:
-      name: data
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      storageClassName: standard
-      resources:
-        requests:
-          storage: 512Mi
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
   name: prometheus
   namespace: observability
 spec:

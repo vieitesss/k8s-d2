@@ -19,7 +19,7 @@ func ApplyFixtures(
 	var err error
 	fixtureNamespaces := []string{namespace}
 	if includeVisual {
-		fixtureNamespaces = append(fixtureNamespaces, "payments", "observability")
+		fixtureNamespaces = append(fixtureNamespaces, "observability")
 	}
 
 	if !reuseNamespace {
@@ -30,6 +30,15 @@ func ApplyFixtures(
 			if err != nil {
 				return nil, fmt.Errorf("failed to clean up namespace %s: %w", fixtureNamespace, err)
 			}
+		}
+	}
+
+	if includeVisual {
+		kindContainer, err = kindContainer.
+			WithExec([]string{"kubectl", "delete", "namespace", "payments", "--ignore-not-found=true", "--wait=true", "--timeout=60s"}).
+			Sync(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to clean up retired namespace payments: %w", err)
 		}
 	}
 
@@ -104,9 +113,6 @@ func ApplyFixtures(
 	}
 	if includeVisual {
 		readyChecks = append(readyChecks,
-			[]string{"kubectl", "rollout", "status", "deployment/payments-api", "-n", "payments", "--timeout=120s"},
-			[]string{"kubectl", "rollout", "status", "deployment/payments-worker", "-n", "payments", "--timeout=120s"},
-			[]string{"kubectl", "rollout", "status", "statefulset/redis-cache", "-n", "payments", "--timeout=120s"},
 			[]string{"kubectl", "rollout", "status", "deployment/grafana", "-n", "observability", "--timeout=120s"},
 			[]string{"kubectl", "rollout", "status", "statefulset/prometheus", "-n", "observability", "--timeout=120s"},
 			[]string{"kubectl", "rollout", "status", "daemonset/node-exporter", "-n", "observability", "--timeout=120s"},
