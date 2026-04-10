@@ -149,6 +149,140 @@ func TestRender_IgnoresDeprecatedGridColumns(t *testing.T) {
 	}
 }
 
+func TestRender_SortsNamespacesAndResourcesDeterministically(t *testing.T) {
+	cluster := &model.Cluster{
+		Namespaces: []model.Namespace{
+			{
+				Name: "zeta",
+				Deployments: []model.Workload{
+					{Name: "web", Kind: "Deployment", Replicas: 2},
+				},
+			},
+			{
+				Name: "alpha",
+				Deployments: []model.Workload{
+					{Name: "z-api", Kind: "Deployment", Replicas: 2},
+					{Name: "a-api", Kind: "Deployment", Replicas: 1},
+				},
+				StatefulSets: []model.Workload{
+					{Name: "z-db", Kind: "StatefulSet", Replicas: 1},
+					{Name: "a-db", Kind: "StatefulSet", Replicas: 1},
+				},
+				DaemonSets: []model.Workload{
+					{Name: "z-agent", Kind: "DaemonSet", Replicas: 3},
+					{Name: "a-agent", Kind: "DaemonSet", Replicas: 3},
+				},
+				Services: []model.Service{
+					{Name: "z-service", Type: "ClusterIP"},
+					{Name: "a-service", Type: "ClusterIP"},
+				},
+				PVCs: []model.PVC{
+					{Name: "z-data"},
+					{Name: "a-data"},
+				},
+			},
+		},
+	}
+
+	output := renderTestCluster(t, cluster)
+
+	assertAppearsInOrder(t, output,
+		"  alpha: {",
+		"  zeta: {",
+	)
+
+	alphaBlock := extractBlockFromMarker(t, output, "  alpha:")
+	assertAppearsInOrder(t, alphaBlock,
+		"  a_api: {",
+		"  z_api: {",
+	)
+	assertAppearsInOrder(t, alphaBlock,
+		"  a_db: {",
+		"  z_db: {",
+	)
+	assertAppearsInOrder(t, alphaBlock,
+		"  a_agent: {",
+		"  z_agent: {",
+	)
+	assertAppearsInOrder(t, alphaBlock,
+		"  svc_a_service: {",
+		"  svc_z_service: {",
+	)
+	assertAppearsInOrder(t, alphaBlock,
+		"  pvc_a_data: {",
+		"  pvc_z_data: {",
+	)
+}
+
+func TestRender_SortsWorkloadPVCConnectionsDeterministically(t *testing.T) {
+	cluster := &model.Cluster{
+		Namespaces: []model.Namespace{{
+			Name: "apps",
+			Deployments: []model.Workload{{
+				Name:     "web",
+				Kind:     "Deployment",
+				Replicas: 1,
+				VolumeMounts: []model.VolumeMount{
+					{PVCName: "z-cache", MountPath: "/cache"},
+					{PVCName: "a-data", MountPath: "/data", ReadOnly: true},
+				},
+			}},
+			PVCs: []model.PVC{
+				{Name: "z-cache"},
+				{Name: "a-data"},
+			},
+		}},
+	}
+
+	output := renderTestCluster(t, cluster)
+	appsBlock := extractBlockFromMarker(t, output, "  apps:")
+
+	assertAppearsInOrder(t, appsBlock,
+		"  web -> pvc_a_data: \"/data (ro)\"",
+		"  web -> pvc_z_cache: \"/cache (rw)\"",
+	)
+}
+
+func TestRender_ProducesSameOutputForRepeatedRenders(t *testing.T) {
+	cluster := &model.Cluster{
+		Namespaces: []model.Namespace{{
+			Name: "beta",
+			Services: []model.Service{
+				{Name: "z-service", Type: "ClusterIP", Selector: map[string]string{"app": "api"}},
+				{Name: "a-service", Type: "ClusterIP", Selector: map[string]string{"app": "api"}},
+			},
+			Deployments: []model.Workload{{
+				Name:     "api",
+				Kind:     "Deployment",
+				Replicas: 1,
+				Labels:   map[string]string{"app": "api"},
+				VolumeMounts: []model.VolumeMount{
+					{PVCName: "z-cache", MountPath: "/cache"},
+					{PVCName: "a-data", MountPath: "/data"},
+				},
+			}},
+			PVCs: []model.PVC{
+				{Name: "z-cache"},
+				{Name: "a-data"},
+			},
+		}, {
+			Name: "alpha",
+			DaemonSets: []model.Workload{{
+				Name:     "node-agent",
+				Kind:     "DaemonSet",
+				Replicas: 2,
+			}},
+		}},
+	}
+
+	first := renderTestCluster(t, cluster)
+	second := renderTestCluster(t, cluster)
+
+	if first != second {
+		t.Fatalf("expected repeated renders to match\nfirst:\n%s\nsecond:\n%s", first, second)
+	}
+}
+
 func renderTestCluster(t *testing.T, cluster *model.Cluster) string {
 	t.Helper()
 
@@ -189,4 +323,20 @@ func extractBlockFromMarker(t *testing.T, input, marker string) string {
 
 	t.Fatalf("unclosed block for marker %q in output:\n%s", marker, input)
 	return ""
+}
+
+func assertAppearsInOrder(t *testing.T, input string, markers ...string) {
+	t.Helper()
+
+	lastIndex := -1
+	for _, marker := range markers {
+		index := strings.Index(input, marker)
+		if index == -1 {
+			t.Fatalf("missing marker %q in output:\n%s", marker, input)
+		}
+		if index <= lastIndex {
+			t.Fatalf("expected %q to appear after previous marker in output:\n%s", marker, input)
+		}
+		lastIndex = index
+	}
 }
