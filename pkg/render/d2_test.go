@@ -110,6 +110,45 @@ func TestRenderLegend_IncludesOnlyRenderedResourceTypes(t *testing.T) {
 	}
 }
 
+func TestRender_IgnoresDeprecatedGridColumns(t *testing.T) {
+	cluster := &model.Cluster{
+		Namespaces: []model.Namespace{
+			{
+				Name: "vars",
+				Deployments: []model.Workload{{
+					Name:     "web",
+					Kind:     "Deployment",
+					Replicas: 1,
+				}},
+			},
+			{
+				Name: "infra",
+				Services: []model.Service{{
+					Name: "metrics",
+					Type: "ClusterIP",
+				}},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	renderer := NewD2Renderer(&buf, 4)
+	if err := renderer.Render(cluster); err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+
+	output := buf.String()
+	if strings.Contains(output, "grid-columns:") {
+		t.Fatalf("expected automatic layout without grid constraints, output was:\n%s", output)
+	}
+	if !strings.Contains(output, "namespaces: {") {
+		t.Fatalf("expected namespaces container in output, output was:\n%s", output)
+	}
+	if !strings.Contains(output, "  vars: {") {
+		t.Fatalf("expected namespace to render inside namespaces container, output was:\n%s", output)
+	}
+}
+
 func renderTestCluster(t *testing.T, cluster *model.Cluster) string {
 	t.Helper()
 

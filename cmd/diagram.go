@@ -30,6 +30,9 @@ func init() {
 	diagramCmd.Flags().StringVarP(&rootOptions.output, "output", "o", "", "output D2 file (default: stdout)")
 	diagramCmd.Flags().StringVarP(&rootOptions.image, "image", "i", "", "output .svg image file. Extension is not needed always SVG file is generated")
 	diagramCmd.Flags().BoolVar(&rootOptions.includeStorage, "include-storage", false, "include PVC/StorageClass layer")
-	diagramCmd.Flags().IntVar(&rootOptions.gridColumns, "grid-columns", 3, "number of columns in grid layout (0 for single column)")
+	diagramCmd.Flags().IntVar(&rootOptions.gridColumns, "grid-columns", 3, "deprecated: automatic layout is used")
+	if err := diagramCmd.Flags().MarkDeprecated("grid-columns", "automatic layout is now used; this flag has no effect"); err != nil {
+		panic(err)
+	}
 	diagramCmd.Flags().BoolVarP(&rootOptions.quiet, "quiet", "q", false, "suppress progress indicators and log messages")
 }
