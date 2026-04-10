@@ -105,7 +105,7 @@ func (v *D2Validator) ValidateResources() error {
 
 		// Check services
 		for _, svc := range ns.Services {
-			svcID := "svc_" + render.SanitizeID(svc.Name)
+			svcID := render.ServiceID(svc.Name)
 			if !strings.Contains(v.actual, svcID) {
 				return fmt.Errorf("missing service: %s", svc.Name)
 			}
@@ -113,7 +113,7 @@ func (v *D2Validator) ValidateResources() error {
 
 		// Check PVCs
 		for _, pvc := range ns.PVCs {
-			pvcID := "pvc_" + render.SanitizeID(pvc.Name)
+			pvcID := render.PVCID(pvc.Name)
 			if !strings.Contains(v.actual, pvcID) {
 				return fmt.Errorf("missing PVC: %s", pvc.Name)
 			}
@@ -166,8 +166,8 @@ func (v *D2Validator) ValidateServiceConnections() error {
 
 		for _, conn := range connections {
 			connectionStr := fmt.Sprintf("%s -> %s", conn.From, conn.To)
-			if !strings.Contains(v.actual, connectionStr) {
-				return fmt.Errorf("missing expected connection: %s", connectionStr)
+			if !containsD2Line(v.actual, connectionStr) {
+				return fmt.Errorf("missing expected connection: %s -> %s", conn.From, conn.To)
 			}
 		}
 	}
@@ -188,17 +188,17 @@ func (v *D2Validator) ValidatePVCConnections() error {
 		for _, conn := range connections {
 			// Check basic connection exists
 			baseConnectionStr := fmt.Sprintf("%s -> %s", conn.From, conn.To)
-			if !strings.Contains(v.actual, baseConnectionStr) {
-				return fmt.Errorf("missing workload-to-PVC connection: %s", baseConnectionStr)
+			if !containsD2LinePrefix(v.actual, baseConnectionStr) {
+				return fmt.Errorf("missing workload-to-PVC connection: %s -> %s", conn.From, conn.To)
 			}
 
 			// If connection has mount metadata, validate the label appears
 			if conn.Label != "" {
-				fullConnectionStr := fmt.Sprintf("%s: \"%s\"", baseConnectionStr, conn.Label)
-				if !strings.Contains(v.actual, fullConnectionStr) {
+				fullConnectionStr := fmt.Sprintf("%s: %s", baseConnectionStr, render.QuoteString(conn.Label))
+				if !containsD2Line(v.actual, fullConnectionStr) {
 					return fmt.Errorf(
 						"connection %s missing expected mount metadata: %s",
-						baseConnectionStr,
+						fmt.Sprintf("%s -> %s", conn.From, conn.To),
 						conn.Label,
 					)
 				}
@@ -230,6 +230,27 @@ func (v *D2Validator) ValidateConfigInfo() error {
 
 	return nil
 }
+
+func containsD2Line(input, expected string) bool {
+	for _, line := range strings.Split(input, "\n") {
+		if strings.TrimSpace(line) == expected {
+			return true
+		}
+	}
+
+	return false
+}
+
+func containsD2LinePrefix(input, prefix string) bool {
+	for _, line := range strings.Split(input, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), prefix) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func extractD2Block(input, marker string) (string, error) {
 	markerIndex := strings.Index(input, marker)
 	if markerIndex == -1 {

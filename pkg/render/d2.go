@@ -1,9 +1,11 @@
 package render
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/vieitesss/k8s-d2/pkg/model"
@@ -115,7 +117,7 @@ func (r *D2Renderer) renderNamespaceIndented(ns *model.Namespace, indent string)
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "%s%s: {\n", indent, nsID)
-	fmt.Fprintf(&b, "%s  label: %s\n", indent, ns.Name)
+	fmt.Fprintf(&b, "%s  label: %s\n", indent, QuoteString(ns.Name))
 	fmt.Fprintf(&b, "%s  style.fill: \"#f0f0f0\"\n\n", indent)
 
 	r.writeAllWorkloads(&b, ns, indent)
@@ -152,7 +154,7 @@ func (r *D2Renderer) writeAllServices(b *strings.Builder, ns *model.Namespace, i
 func (r *D2Renderer) writeConfigInfo(b *strings.Builder, ns *model.Namespace, indent string) {
 	if ns.ConfigMaps > 0 || ns.Secrets > 0 {
 		fmt.Fprintf(b, "%s  _config: {\n", indent)
-		fmt.Fprintf(b, "%s    label: \"CM: %d | Sec: %d\"\n", indent, ns.ConfigMaps, ns.Secrets)
+		fmt.Fprintf(b, "%s    label: %s\n", indent, QuoteString(fmt.Sprintf("CM: %d | Sec: %d", ns.ConfigMaps, ns.Secrets)))
 		fmt.Fprintf(b, "%s    style.fill: \"#ffffcc\"\n", indent)
 		fmt.Fprintf(b, "%s  }\n", indent)
 	}
@@ -160,16 +162,16 @@ func (r *D2Renderer) writeConfigInfo(b *strings.Builder, ns *model.Namespace, in
 
 func (r *D2Renderer) writePVCs(b *strings.Builder, ns *model.Namespace, indent string) {
 	for _, pvc := range ns.PVCs {
-		pvcID := SanitizeID(pvc.Name)
+		pvcID := PVCID(pvc.Name)
 		label := fmt.Sprintf("💾 %s", pvc.Name)
 		if pvc.Capacity != "" {
-			label = fmt.Sprintf("%s\\n%s", label, pvc.Capacity)
+			label = fmt.Sprintf("%s\n%s", label, pvc.Capacity)
 		}
 		if pvc.StorageClass != "" {
-			label = fmt.Sprintf("%s\\n[%s]", label, pvc.StorageClass)
+			label = fmt.Sprintf("%s\n[%s]", label, pvc.StorageClass)
 		}
-		fmt.Fprintf(b, "%s  pvc_%s: {\n", indent, pvcID)
-		fmt.Fprintf(b, "%s    label: \"%s\"\n", indent, label)
+		fmt.Fprintf(b, "%s  %s: {\n", indent, pvcID)
+		fmt.Fprintf(b, "%s    label: %s\n", indent, QuoteString(label))
 		fmt.Fprintf(b, "%s    style.fill: \"#e6f3ff\"\n", indent)
 		fmt.Fprintf(b, "%s  }\n", indent)
 	}
@@ -180,15 +182,15 @@ func (r *D2Renderer) writeWorkload(b *strings.Builder, w *model.Workload, indent
 	icon := WorkloadIcon(w.Kind)
 
 	fmt.Fprintf(b, "%s  %s: {\n", indent, wID)
-	fmt.Fprintf(b, "%s    label: \"%s %s (%d)\"\n", indent, icon, w.Name, w.Replicas)
+	fmt.Fprintf(b, "%s    label: %s\n", indent, QuoteString(fmt.Sprintf("%s %s (%d)", icon, w.Name, w.Replicas)))
 	fmt.Fprintf(b, "%s  }\n", indent)
 }
 
 func (r *D2Renderer) writeService(b *strings.Builder, svc *model.Service, indent string) {
-	svcID := SanitizeID(svc.Name)
+	svcID := ServiceID(svc.Name)
 
-	fmt.Fprintf(b, "%s  svc_%s: {\n", indent, svcID)
-	fmt.Fprintf(b, "%s    label: \"⎈ %s\\n%s\"\n", indent, svc.Name, svc.Type)
+	fmt.Fprintf(b, "%s  %s: {\n", indent, svcID)
+	fmt.Fprintf(b, "%s    label: %s\n", indent, QuoteString(fmt.Sprintf("⎈ %s\n%s", svc.Name, svc.Type)))
 	fmt.Fprintf(b, "%s    style.fill: \"#cce5ff\"\n", indent)
 	fmt.Fprintf(b, "%s  }\n", indent)
 }
@@ -232,23 +234,23 @@ func (r *D2Renderer) writeWorkloadPVCConnections(b *strings.Builder, ns *model.N
 
 			for _, pvcName := range pvcNames {
 				mounts := mountsByPVC[pvcName]
-				pvcID := SanitizeID(pvcName)
+				pvcID := PVCID(pvcName)
 				label := model.FormatMountLabel(mounts)
-				fmt.Fprintf(b, "%s  %s -> pvc_%s: \"%s\"\n", indent, workloadID, pvcID, label)
+				fmt.Fprintf(b, "%s  %s -> %s: %s\n", indent, workloadID, pvcID, QuoteString(label))
 			}
 		}
 	}
 }
 
 func (r *D2Renderer) writeServiceConnections(b *strings.Builder, svc *model.Service, ns *model.Namespace, indent string) {
-	svcID := SanitizeID(svc.Name)
+	svcID := ServiceID(svc.Name)
 	allWorkloads := [][]model.Workload{ns.Deployments, ns.StatefulSets, ns.DaemonSets}
 
 	for _, workloads := range allWorkloads {
 		for _, w := range workloads {
 			if LabelsMatch(svc.Selector, w.Labels) {
 				wID := SanitizeID(w.Name)
-				fmt.Fprintf(b, "%s  svc_%s -> %s\n", indent, svcID, wID)
+				fmt.Fprintf(b, "%s  %s -> %s\n", indent, svcID, wID)
 			}
 		}
 	}
@@ -265,9 +267,9 @@ func (r *D2Renderer) renderLegend(cluster *model.Cluster) error {
 
 	for i, entry := range entries {
 		fmt.Fprintf(&b, "    %s: {\n", entry.id)
-		fmt.Fprintf(&b, "      label: %q\n", entry.label)
+		fmt.Fprintf(&b, "      label: %s\n", QuoteString(entry.label))
 		if entry.fill != "" {
-			fmt.Fprintf(&b, "      style.fill: %q\n", entry.fill)
+			fmt.Fprintf(&b, "      style.fill: %s\n", QuoteString(entry.fill))
 		}
 		b.WriteString("    }\n")
 		if i < len(entries)-1 {
@@ -378,10 +380,26 @@ func legendEntries(cluster *model.Cluster) []legendEntry {
 	return entries
 }
 
-// SanitizeID converts a Kubernetes resource name to a valid D2 identifier.
-// D2 syntax doesn't allow hyphens, so we convert them to underscores.
+// SanitizeID converts an arbitrary Kubernetes name into a D2-safe identifier.
+// The encoded form avoids collisions from lossy substitutions and keeps
+// D2 path syntax from reinterpreting characters like dots.
 func SanitizeID(s string) string {
-	return strings.ReplaceAll(s, "-", "_")
+	return "id_" + hex.EncodeToString([]byte(s))
+}
+
+// ServiceID returns the rendered D2 identifier for a Service node.
+func ServiceID(name string) string {
+	return "svc_" + SanitizeID(name)
+}
+
+// PVCID returns the rendered D2 identifier for a PVC node.
+func PVCID(name string) string {
+	return "pvc_" + SanitizeID(name)
+}
+
+// QuoteString returns s as a D2 string literal.
+func QuoteString(s string) string {
+	return strconv.Quote(s)
 }
 
 // WorkloadIcon returns the D2 icon for a workload type.
