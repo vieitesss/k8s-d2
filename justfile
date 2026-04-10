@@ -1,4 +1,3 @@
-outputFile := "cluster.d2"
 outputImage := "cluster.svg"
 
 alias b := build
@@ -21,7 +20,7 @@ build:
 	go build -o k8sdd
 
 run *parameters: build
-	./k8sdd {{parameters}}
+	./k8sdd diagram {{parameters}}
 
 generate *parameters: build
 	./k8sdd diagram {{parameters}} -i {{outputImage}}
