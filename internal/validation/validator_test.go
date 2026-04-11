@@ -442,6 +442,55 @@ namespaces: {
 	}
 }
 
+func TestParseTestFixtures_ExcludesStatefulSetGeneratedPVCsWithoutStorage(t *testing.T) {
+	data, err := loadBaseFixtures()
+	if err != nil {
+		t.Fatalf("Failed to load base fixtures: %v", err)
+	}
+
+	cluster, err := parseTestFixtures(data, false)
+	if err != nil {
+		t.Fatalf("Failed to parse base fixtures: %v", err)
+	}
+
+	if len(cluster.Namespaces) != 1 {
+		t.Fatalf("expected one namespace, got %d", len(cluster.Namespaces))
+	}
+
+	for _, pvc := range cluster.Namespaces[0].PVCs {
+		if strings.HasPrefix(pvc.Name, "data-database-") {
+			t.Fatalf("did not expect generated statefulset PVC %q without storage parsing", pvc.Name)
+		}
+	}
+}
+
+func TestParseTestFixtures_IncludesStatefulSetGeneratedPVCsWithStorage(t *testing.T) {
+	data, err := loadAllFixtures()
+	if err != nil {
+		t.Fatalf("Failed to load all fixtures: %v", err)
+	}
+
+	cluster, err := parseTestFixtures(data, true)
+	if err != nil {
+		t.Fatalf("Failed to parse all fixtures: %v", err)
+	}
+
+	if len(cluster.Namespaces) != 1 {
+		t.Fatalf("expected one namespace, got %d", len(cluster.Namespaces))
+	}
+
+	pvcNames := make(map[string]struct{}, len(cluster.Namespaces[0].PVCs))
+	for _, pvc := range cluster.Namespaces[0].PVCs {
+		pvcNames[pvc.Name] = struct{}{}
+	}
+
+	for _, name := range []string{"logs-volume", "data-database-0", "data-database-1"} {
+		if _, ok := pvcNames[name]; !ok {
+			t.Fatalf("expected PVC %q in parsed storage fixtures", name)
+		}
+	}
+}
+
 // Test constants
 const (
 	testNamespace = "k8s-d2-test"
@@ -488,8 +537,8 @@ func loadAllFixtures() ([][]byte, error) {
 }
 
 // parseTestFixtures parses fixture data into a cluster model
-func parseTestFixtures(fixtureData [][]byte) (*model.Cluster, error) {
-	parser := validation.NewFixtureParser(testNamespace)
+func parseTestFixtures(fixtureData [][]byte, includeStorage bool) (*model.Cluster, error) {
+	parser := validation.NewFixtureParser(testNamespace, includeStorage)
 	return parser.ParseFixtures(fixtureData)
 }
 
@@ -499,7 +548,7 @@ func loadAndParseBaseFixtures() (*model.Cluster, error) {
 	if err != nil {
 		return nil, err
 	}
-	return parseTestFixtures(data)
+	return parseTestFixtures(data, false)
 }
 
 // loadAndParseAllFixtures is a convenience function that loads and parses all fixtures
@@ -508,7 +557,7 @@ func loadAndParseAllFixtures() (*model.Cluster, error) {
 	if err != nil {
 		return nil, err
 	}
-	return parseTestFixtures(data)
+	return parseTestFixtures(data, true)
 }
 
 // loadFixtures reads fixture files from test/fixtures/<dir>/
