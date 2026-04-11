@@ -193,11 +193,11 @@ func (p *FixtureParser) parseService(doc []byte, ns *model.Namespace) error {
 		Selector: svc.Spec.Selector,
 	}
 
-	// Add ports if needed in the future
 	for _, port := range svc.Spec.Ports {
 		service.Ports = append(service.Ports, model.Port{
+			Name:       port.Name,
 			Port:       port.Port,
-			TargetPort: port.TargetPort.IntVal,
+			TargetPort: kube.ServiceTargetPort(port),
 		})
 	}
 

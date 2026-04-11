@@ -188,9 +188,13 @@ func (r *D2Renderer) writeWorkload(b *strings.Builder, w *model.Workload, indent
 
 func (r *D2Renderer) writeService(b *strings.Builder, svc *model.Service, indent string) {
 	svcID := ServiceID(svc.Name)
+	label := fmt.Sprintf("⎈ %s\n%s", svc.Name, svc.Type)
+	if len(svc.Ports) > 0 {
+		label = fmt.Sprintf("%s\n%s", label, model.FormatServicePortsLabel(svc.Ports))
+	}
 
 	fmt.Fprintf(b, "%s  %s: {\n", indent, svcID)
-	fmt.Fprintf(b, "%s    label: %s\n", indent, QuoteString(fmt.Sprintf("⎈ %s\n%s", svc.Name, svc.Type)))
+	fmt.Fprintf(b, "%s    label: %s\n", indent, QuoteString(label))
 	fmt.Fprintf(b, "%s    style.fill: \"#cce5ff\"\n", indent)
 	fmt.Fprintf(b, "%s  }\n", indent)
 }
