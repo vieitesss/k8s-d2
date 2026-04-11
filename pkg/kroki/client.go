@@ -5,13 +5,20 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
 const (
-	defaultBaseURL = "https://kroki.io"
-	defaultTimeout = 30 * time.Second
+	DefaultBaseURL = "https://kroki.io"
+	DefaultTimeout = 30 * time.Second
 )
+
+// Options configures the Kroki client.
+type Options struct {
+	BaseURL string
+	Timeout time.Duration
+}
 
 // Client handles communication with the Kroki API.
 type Client struct {
@@ -21,10 +28,25 @@ type Client struct {
 
 // NewClient creates a new Kroki client with default settings.
 func NewClient() *Client {
+	return NewClientWithOptions(Options{})
+}
+
+// NewClientWithOptions creates a new Kroki client with explicit configuration.
+func NewClientWithOptions(opts Options) *Client {
+	baseURL := opts.BaseURL
+	if baseURL == "" {
+		baseURL = DefaultBaseURL
+	}
+
+	timeout := opts.Timeout
+	if timeout <= 0 {
+		timeout = DefaultTimeout
+	}
+
 	return &Client{
-		baseURL: defaultBaseURL,
+		baseURL: strings.TrimRight(baseURL, "/"),
 		httpClient: &http.Client{
-			Timeout: defaultTimeout,
+			Timeout: timeout,
 		},
 	}
 }
