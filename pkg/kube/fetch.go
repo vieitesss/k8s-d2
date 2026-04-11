@@ -245,6 +245,9 @@ func (c *Client) fetchServices(ctx context.Context, nsName string, ns *model.Nam
 func (c *Client) fetchIngresses(ctx context.Context, nsName string, ns *model.Namespace) error {
 	ingresses, err := c.clientset.NetworkingV1().Ingresses(nsName).List(ctx, metav1.ListOptions{})
 	if err != nil {
+		if apierrors.IsForbidden(err) {
+			return nil
+		}
 		return err
 	}
 
