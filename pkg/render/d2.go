@@ -84,6 +84,7 @@ func sortNamespace(ns *model.Namespace) {
 	ns.Deployments = sortedWorkloads(ns.Deployments)
 	ns.StatefulSets = sortedWorkloads(ns.StatefulSets)
 	ns.DaemonSets = sortedWorkloads(ns.DaemonSets)
+	ns.Entrypoints = sortedEntrypoints(ns.Entrypoints)
 	ns.Services = sortedServices(ns.Services)
 	ns.PVCs = sortedPVCs(ns.PVCs)
 }
@@ -100,6 +101,17 @@ func sortedServices(services []model.Service) []model.Service {
 	sorted := append([]model.Service(nil), services...)
 	sort.Slice(sorted, func(i, j int) bool {
 		return sorted[i].Name < sorted[j].Name
+	})
+	return sorted
+}
+
+func sortedEntrypoints(entrypoints []model.Entrypoint) []model.Entrypoint {
+	sorted := append([]model.Entrypoint(nil), entrypoints...)
+	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].Kind == sorted[j].Kind {
+			return sorted[i].Name < sorted[j].Name
+		}
+		return sorted[i].Kind < sorted[j].Kind
 	})
 	return sorted
 }
@@ -121,6 +133,7 @@ func (r *D2Renderer) renderNamespaceIndented(ns *model.Namespace, indent string)
 	fmt.Fprintf(&b, "%s  style.fill: \"#f0f0f0\"\n\n", indent)
 
 	r.writeAllWorkloads(&b, ns, indent)
+	r.writeAllEntrypoints(&b, ns, indent)
 	r.writeAllServices(&b, ns, indent)
 	r.writeConfigInfo(&b, ns, indent)
 	r.writePVCs(&b, ns, indent)
@@ -142,6 +155,12 @@ func (r *D2Renderer) writeAllWorkloads(b *strings.Builder, ns *model.Namespace, 
 	}
 	for _, w := range ns.DaemonSets {
 		r.writeWorkload(b, &w, indent)
+	}
+}
+
+func (r *D2Renderer) writeAllEntrypoints(b *strings.Builder, ns *model.Namespace, indent string) {
+	for _, entrypoint := range ns.Entrypoints {
+		r.writeEntrypoint(b, &entrypoint, indent)
 	}
 }
 
@@ -195,7 +214,18 @@ func (r *D2Renderer) writeService(b *strings.Builder, svc *model.Service, indent
 	fmt.Fprintf(b, "%s  }\n", indent)
 }
 
+func (r *D2Renderer) writeEntrypoint(b *strings.Builder, entrypoint *model.Entrypoint, indent string) {
+	entrypointID := EntrypointID(entrypoint.Kind, entrypoint.Name)
+
+	fmt.Fprintf(b, "%s  %s: {\n", indent, entrypointID)
+	fmt.Fprintf(b, "%s    label: %s\n", indent, QuoteString(entrypointLabel(entrypoint)))
+	fmt.Fprintf(b, "%s    style.fill: \"#ffe6cc\"\n", indent)
+	fmt.Fprintf(b, "%s  }\n", indent)
+}
+
 func (r *D2Renderer) writeConnections(b *strings.Builder, ns *model.Namespace, indent string) {
+	r.writeEntrypointConnections(b, ns, indent)
+
 	for _, svc := range ns.Services {
 		if len(svc.Selector) == 0 {
 			continue
@@ -242,6 +272,21 @@ func (r *D2Renderer) writeWorkloadPVCConnections(b *strings.Builder, ns *model.N
 	}
 }
 
+func (r *D2Renderer) writeEntrypointConnections(b *strings.Builder, ns *model.Namespace, indent string) {
+	serviceNames := namespaceServiceNames(ns)
+
+	for _, entrypoint := range ns.Entrypoints {
+		entrypointID := EntrypointID(entrypoint.Kind, entrypoint.Name)
+		for _, serviceName := range entrypoint.Services {
+			if _, ok := serviceNames[serviceName]; !ok {
+				continue
+			}
+
+			fmt.Fprintf(b, "%s  %s -> %s\n", indent, entrypointID, ServiceID(serviceName))
+		}
+	}
+}
+
 func (r *D2Renderer) writeServiceConnections(b *strings.Builder, svc *model.Service, ns *model.Namespace, indent string) {
 	svcID := ServiceID(svc.Name)
 	allWorkloads := [][]model.Workload{ns.Deployments, ns.StatefulSets, ns.DaemonSets}
@@ -254,6 +299,75 @@ func (r *D2Renderer) writeServiceConnections(b *strings.Builder, svc *model.Serv
 			}
 		}
 	}
+}
+
+func entrypointLabel(entrypoint *model.Entrypoint) string {
+	parts := []string{fmt.Sprintf("⇢ %s", entrypoint.Name), entrypointKindLabel(entrypoint)}
+
+	if len(entrypoint.Hosts) > 0 {
+		parts = append(parts, strings.Join(entrypoint.Hosts, ", "))
+	}
+
+	if portSummary := entrypointPortSummary(entrypoint); portSummary != "" {
+		parts = append(parts, portSummary)
+	}
+
+	return strings.Join(parts, "\n")
+}
+
+func entrypointKindLabel(entrypoint *model.Entrypoint) string {
+	if entrypoint.Kind == "Ingress" && entrypoint.Class != "" {
+		return fmt.Sprintf("%s [%s]", entrypoint.Kind, entrypoint.Class)
+	}
+
+	return entrypoint.Kind
+}
+
+func entrypointPortSummary(entrypoint *model.Entrypoint) string {
+	ports := make(map[int]struct{}, len(entrypoint.Ports))
+
+	switch entrypoint.Kind {
+	case "NodePort":
+		for _, port := range entrypoint.Ports {
+			if port.NodePort > 0 {
+				ports[int(port.NodePort)] = struct{}{}
+			}
+		}
+	case "LoadBalancer":
+		for _, port := range entrypoint.Ports {
+			if port.Port > 0 {
+				ports[int(port.Port)] = struct{}{}
+			}
+		}
+	default:
+		return ""
+	}
+
+	if len(ports) == 0 {
+		return ""
+	}
+
+	ordered := make([]int, 0, len(ports))
+	for port := range ports {
+		ordered = append(ordered, port)
+	}
+	sort.Ints(ordered)
+
+	labels := make([]string, len(ordered))
+	for i, port := range ordered {
+		labels[i] = strconv.Itoa(port)
+	}
+
+	return strings.Join(labels, ", ")
+}
+
+func namespaceServiceNames(ns *model.Namespace) map[string]struct{} {
+	serviceNames := make(map[string]struct{}, len(ns.Services))
+	for _, svc := range ns.Services {
+		serviceNames[svc.Name] = struct{}{}
+	}
+
+	return serviceNames
 }
 
 func (r *D2Renderer) renderLegend(cluster *model.Cluster) error {
@@ -296,6 +410,7 @@ var allLegendEntryIDs = []string{
 	"deployment",
 	"statefulset",
 	"daemonset",
+	"entrypoint",
 	"service",
 	"config",
 	"pvc",
@@ -320,6 +435,7 @@ func legendEntries(cluster *model.Cluster) []legendEntry {
 	var hasDeployments bool
 	var hasStatefulSets bool
 	var hasDaemonSets bool
+	var hasEntrypoints bool
 	var hasServices bool
 	var hasConfig bool
 	var hasPVCs bool
@@ -328,12 +444,13 @@ func legendEntries(cluster *model.Cluster) []legendEntry {
 		hasDeployments = hasDeployments || len(ns.Deployments) > 0
 		hasStatefulSets = hasStatefulSets || len(ns.StatefulSets) > 0
 		hasDaemonSets = hasDaemonSets || len(ns.DaemonSets) > 0
+		hasEntrypoints = hasEntrypoints || len(ns.Entrypoints) > 0
 		hasServices = hasServices || len(ns.Services) > 0
 		hasConfig = hasConfig || ns.ConfigMaps > 0 || ns.Secrets > 0
 		hasPVCs = hasPVCs || len(ns.PVCs) > 0
 	}
 
-	entries := make([]legendEntry, 0, 6)
+	entries := make([]legendEntry, 0, 7)
 	if hasDeployments {
 		entries = append(entries, legendEntry{
 			id:    "deployment",
@@ -353,6 +470,13 @@ func legendEntries(cluster *model.Cluster) []legendEntry {
 			id:    "daemonset",
 			label: fmt.Sprintf("%s DaemonSet", WorkloadIcon("DaemonSet")),
 			fill:  "#f9f9f9",
+		})
+	}
+	if hasEntrypoints {
+		entries = append(entries, legendEntry{
+			id:    "entrypoint",
+			label: "⇢ Entrypoint",
+			fill:  "#ffe6cc",
 		})
 	}
 	if hasServices {
@@ -385,6 +509,11 @@ func legendEntries(cluster *model.Cluster) []legendEntry {
 // D2 path syntax from reinterpreting characters like dots.
 func SanitizeID(s string) string {
 	return "id_" + hex.EncodeToString([]byte(s))
+}
+
+// EntrypointID returns the rendered D2 identifier for an Entrypoint node.
+func EntrypointID(kind, name string) string {
+	return "ep_" + SanitizeID(strings.ToLower(kind)+":"+name)
 }
 
 // ServiceID returns the rendered D2 identifier for a Service node.

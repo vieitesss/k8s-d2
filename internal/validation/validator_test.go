@@ -59,6 +59,12 @@ func TestD2Validator_BasicTopology(t *testing.T) {
 		}
 	})
 
+	t.Run("ValidateEntrypointConnections", func(t *testing.T) {
+		if err := validator.ValidateEntrypointConnections(); err != nil {
+			t.Errorf("Entrypoint connection validation failed: %v", err)
+		}
+	})
+
 	t.Run("ValidateConfigInfo", func(t *testing.T) {
 		if err := validator.ValidateConfigInfo(); err != nil {
 			t.Errorf("Config info validation failed: %v", err)
@@ -102,6 +108,12 @@ func TestD2Validator_WithStorage(t *testing.T) {
 		}
 	})
 
+	t.Run("ValidateEntrypointConnections", func(t *testing.T) {
+		if err := validator.ValidateEntrypointConnections(); err != nil {
+			t.Errorf("Entrypoint connection validation failed: %v", err)
+		}
+	})
+
 	t.Run("ValidatePVCConnections", func(t *testing.T) {
 		if err := validator.ValidatePVCConnections(); err != nil {
 			t.Errorf("PVC connection validation failed: %v", err)
@@ -115,6 +127,13 @@ func TestD2Validator_EscapedIdentifiersAndLabels(t *testing.T) {
 			Name:       "team.alpha",
 			ConfigMaps: 1,
 			Secrets:    2,
+			Entrypoints: []model.Entrypoint{{
+				Name:     "edge.v2",
+				Kind:     "Ingress",
+				Class:    "nginx.public",
+				Hosts:    []string{"api.v2.example.com"},
+				Services: []string{"api.v2-service"},
+			}},
 			Deployments: []model.Workload{{
 				Name:     "api.v2",
 				Kind:     "Deployment",
@@ -160,6 +179,9 @@ func TestD2Validator_EscapedIdentifiersAndLabels(t *testing.T) {
 	if err := validator.ValidateWorkloadLabels(); err != nil {
 		t.Fatalf("Workload label validation failed: %v", err)
 	}
+	if err := validator.ValidateEntrypointConnections(); err != nil {
+		t.Fatalf("Entrypoint connection validation failed: %v", err)
+	}
 	if err := validator.ValidateServiceConnections(); err != nil {
 		t.Fatalf("Service connection validation failed: %v", err)
 	}
@@ -185,6 +207,7 @@ var (
 		"04-statefulsets.yaml",
 		"05-daemonsets.yaml",
 		"06-services.yaml",
+		"07-ingress.yaml",
 	}
 
 	storageFixtures = []string{

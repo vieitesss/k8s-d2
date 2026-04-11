@@ -7,6 +7,7 @@ import (
 	"github.com/vieitesss/k8s-d2/pkg/model"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"sigs.k8s.io/yaml"
 )
 
@@ -79,6 +80,8 @@ func (p *FixtureParser) parseYAMLDocument(doc []byte, ns *model.Namespace) error
 		return p.parseDaemonSet(doc, ns)
 	case "Service":
 		return p.parseService(doc, ns)
+	case "Ingress":
+		return p.parseIngress(doc, ns)
 	case "PersistentVolumeClaim":
 		return p.parsePVC(doc, ns)
 	case "ConfigMap":
@@ -196,12 +199,28 @@ func (p *FixtureParser) parseService(doc []byte, ns *model.Namespace) error {
 	// Add ports if needed in the future
 	for _, port := range svc.Spec.Ports {
 		service.Ports = append(service.Ports, model.Port{
+			Name:       port.Name,
 			Port:       port.Port,
 			TargetPort: port.TargetPort.IntVal,
+			NodePort:   port.NodePort,
 		})
 	}
 
 	ns.Services = append(ns.Services, service)
+	if entrypoint, ok := kube.EntrypointForService(service); ok {
+		ns.Entrypoints = append(ns.Entrypoints, entrypoint)
+	}
+	return nil
+}
+
+// parseIngress converts a Kubernetes Ingress to a model.Entrypoint.
+func (p *FixtureParser) parseIngress(doc []byte, ns *model.Namespace) error {
+	var ing networkingv1.Ingress
+	if err := yaml.Unmarshal(doc, &ing); err != nil {
+		return err
+	}
+
+	ns.Entrypoints = append(ns.Entrypoints, kube.EntrypointForIngress(ing))
 	return nil
 }
 

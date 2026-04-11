@@ -122,6 +122,7 @@ func (c *Client) fetchNamespace(ctx context.Context, nsName string, opts FetchOp
 		c.fetchStatefulSets,
 		c.fetchDaemonSets,
 		c.fetchServices,
+		c.fetchIngresses,
 		c.fetchConfigMapsAndSecrets,
 	}
 
@@ -222,15 +223,35 @@ func (c *Client) fetchServices(ctx context.Context, nsName string, ns *model.Nam
 				Name:       p.Name,
 				Port:       p.Port,
 				TargetPort: p.TargetPort.IntVal,
+				NodePort:   p.NodePort,
 			})
 		}
-		ns.Services = append(ns.Services, model.Service{
+
+		service := model.Service{
 			Name:     svc.Name,
 			Type:     string(svc.Spec.Type),
 			Selector: svc.Spec.Selector,
 			Ports:    ports,
-		})
+		}
+
+		ns.Services = append(ns.Services, service)
+		if entrypoint, ok := EntrypointForService(service); ok {
+			ns.Entrypoints = append(ns.Entrypoints, entrypoint)
+		}
 	}
+	return nil
+}
+
+func (c *Client) fetchIngresses(ctx context.Context, nsName string, ns *model.Namespace) error {
+	ingresses, err := c.clientset.NetworkingV1().Ingresses(nsName).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, ing := range ingresses.Items {
+		ns.Entrypoints = append(ns.Entrypoints, EntrypointForIngress(ing))
+	}
+
 	return nil
 }
 

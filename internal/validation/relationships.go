@@ -9,7 +9,7 @@ import (
 type Connection struct {
 	From  string // Source resource ID (e.g., "svc_id_7765622d73657276696365")
 	To    string // Target resource ID (e.g., "id_7765622d66726f6e74656e64")
-	Type  string // Connection type: "service-to-workload" or "workload-to-pvc"
+	Type  string // Connection type: "entrypoint-to-service", "service-to-workload", or "workload-to-pvc"
 	Label string // Connection label for mount metadata (e.g., "/var/log (rw)")
 }
 
@@ -19,6 +19,34 @@ type RelationshipDeriver struct{}
 // NewRelationshipDeriver creates a new RelationshipDeriver
 func NewRelationshipDeriver() *RelationshipDeriver {
 	return &RelationshipDeriver{}
+}
+
+// EntrypointToServiceConnections derives all entrypoint→service connections in a
+// namespace based on the backend services each entrypoint references.
+func (rd *RelationshipDeriver) EntrypointToServiceConnections(ns *model.Namespace) []Connection {
+	var connections []Connection
+
+	services := make(map[string]struct{}, len(ns.Services))
+	for _, svc := range ns.Services {
+		services[svc.Name] = struct{}{}
+	}
+
+	for _, entrypoint := range ns.Entrypoints {
+		entrypointID := render.EntrypointID(entrypoint.Kind, entrypoint.Name)
+		for _, serviceName := range entrypoint.Services {
+			if _, ok := services[serviceName]; !ok {
+				continue
+			}
+
+			connections = append(connections, Connection{
+				From: entrypointID,
+				To:   render.ServiceID(serviceName),
+				Type: "entrypoint-to-service",
+			})
+		}
+	}
+
+	return connections
 }
 
 // ServiceToWorkloadConnections derives all service→workload connections in a namespace

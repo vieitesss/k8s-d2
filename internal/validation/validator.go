@@ -103,6 +103,14 @@ func (v *D2Validator) ValidateResources() error {
 			}
 		}
 
+		// Check entrypoints
+		for _, entrypoint := range ns.Entrypoints {
+			entrypointID := render.EntrypointID(entrypoint.Kind, entrypoint.Name)
+			if !strings.Contains(v.actual, entrypointID) {
+				return fmt.Errorf("missing entrypoint: %s (%s)", entrypoint.Name, entrypoint.Kind)
+			}
+		}
+
 		// Check services
 		for _, svc := range ns.Services {
 			svcID := render.ServiceID(svc.Name)
@@ -152,6 +160,22 @@ func (v *D2Validator) ValidateWorkloadLabels() error {
 			expectedLabel := fmt.Sprintf("%s %s", icon, w.Name)
 			if !strings.Contains(v.actual, expectedLabel) {
 				return fmt.Errorf("incorrect label for %s (expected: %s)", w.Name, expectedLabel)
+			}
+		}
+	}
+
+	return nil
+}
+
+// ValidateEntrypointConnections checks that entrypoint-to-service connections exist.
+func (v *D2Validator) ValidateEntrypointConnections() error {
+	for _, ns := range v.expected.Namespaces {
+		connections := v.deriver.EntrypointToServiceConnections(&ns)
+
+		for _, conn := range connections {
+			connectionStr := fmt.Sprintf("%s -> %s", conn.From, conn.To)
+			if !containsD2Line(v.actual, connectionStr) {
+				return fmt.Errorf("missing expected connection: %s -> %s", conn.From, conn.To)
 			}
 		}
 	}

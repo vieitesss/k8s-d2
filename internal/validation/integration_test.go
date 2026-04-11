@@ -44,6 +44,10 @@ func TestD2Output_BasicFromEnv(t *testing.T) {
 		t.Errorf("Service connection validation failed: %v", err)
 	}
 
+	if err := validator.ValidateEntrypointConnections(); err != nil {
+		t.Errorf("Entrypoint connection validation failed: %v", err)
+	}
+
 	if err := validator.ValidateConfigInfo(); err != nil {
 		t.Errorf("Config info validation failed: %v", err)
 	}
@@ -75,6 +79,10 @@ func TestD2Output_StorageFromEnv(t *testing.T) {
 
 	if err := validator.ValidateResources(); err != nil {
 		t.Errorf("Resource validation failed: %v", err)
+	}
+
+	if err := validator.ValidateEntrypointConnections(); err != nil {
+		t.Errorf("Entrypoint connection validation failed: %v", err)
 	}
 
 	if err := validator.ValidatePVCConnections(); err != nil {
