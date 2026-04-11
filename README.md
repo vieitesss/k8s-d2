@@ -78,6 +78,14 @@ Or generate an SVG directly (no D2 installation required):
 k8sdd diagram -i cluster.svg
 ```
 
+By default, SVG generation uses `https://kroki.io` with a `30s` timeout.
+
+Use a private or self-hosted Kroki deployment when needed:
+
+```bash
+k8sdd diagram -i cluster.svg --kroki-base-url https://kroki.internal --kroki-timeout 60s
+```
+
 ## Flags
 
 | Flag | Short | Default | Description |
@@ -87,10 +95,14 @@ k8sdd diagram -i cluster.svg
 | `--all-namespaces` | `-A` | `false` | Include system namespaces |
 | `--output` | `-o` | stdout | Output D2 file path |
 | `--image` | `-i` | | Output SVG image file (uses Kroki API) |
+| `--kroki-base-url` | | `https://kroki.io` | Kroki base URL for SVG generation |
+| `--kroki-timeout` | | `30s` | Kroki request timeout for SVG generation |
 | `--include-storage` | | `false` | Include PVCs and StorageClasses |
 | `--quiet` | `-q` | `false` | Suppress progress indicators and log messages |
 
 > **Note:** `--output` and `--image` are mutually exclusive.
+>
+> `--kroki-base-url` and `--kroki-timeout` are only used with `--image`. When set, the Kroki base URL must not be empty and the timeout must be greater than `0`.
 
 ## Requirements
 

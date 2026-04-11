@@ -4,7 +4,35 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
+
+func TestNewClientDefaults(t *testing.T) {
+	client := NewClient()
+
+	if client.baseURL != DefaultBaseURL {
+		t.Fatalf("expected default base URL %q, got %q", DefaultBaseURL, client.baseURL)
+	}
+
+	if client.httpClient.Timeout != DefaultTimeout {
+		t.Fatalf("expected default timeout %s, got %s", DefaultTimeout, client.httpClient.Timeout)
+	}
+}
+
+func TestNewClientUsesConfiguredBaseURLAndTimeout(t *testing.T) {
+	client := NewClientWithOptions(Options{
+		BaseURL: "  https://kroki.internal/  ",
+		Timeout: 45 * time.Second,
+	})
+
+	if client.baseURL != "https://kroki.internal" {
+		t.Fatalf("expected normalized base URL %q, got %q", "https://kroki.internal", client.baseURL)
+	}
+
+	if client.httpClient.Timeout != 45*time.Second {
+		t.Fatalf("expected timeout %s, got %s", 45*time.Second, client.httpClient.Timeout)
+	}
+}
 
 func TestGenerateSVG_Success(t *testing.T) {
 	mockSVG := []byte(`<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>`)
@@ -25,10 +53,7 @@ func TestGenerateSVG_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
-		baseURL:    server.URL,
-		httpClient: server.Client(),
-	}
+	client := NewClientWithOptions(Options{BaseURL: server.URL + "/", Timeout: time.Second})
 
 	result, err := client.GenerateSVG("a -> b")
 	if err != nil {
@@ -51,10 +76,7 @@ func TestGenerateSVG_NonOKStatus(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
-		baseURL:    server.URL,
-		httpClient: server.Client(),
-	}
+	client := NewClientWithOptions(Options{BaseURL: server.URL, Timeout: time.Second})
 
 	_, err := client.GenerateSVG("invalid diagram")
 	if err == nil {
@@ -69,10 +91,7 @@ func TestGenerateSVG_ServerError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
-		baseURL:    server.URL,
-		httpClient: server.Client(),
-	}
+	client := NewClientWithOptions(Options{BaseURL: server.URL, Timeout: time.Second})
 
 	_, err := client.GenerateSVG("a -> b")
 	if err == nil {
