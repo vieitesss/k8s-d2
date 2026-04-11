@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/spf13/pflag"
+	"github.com/vieitesss/k8s-d2/pkg/kroki"
 )
 
 func TestRootAndDiagramExposeSameGenerationFlags(t *testing.T) {
@@ -16,6 +18,8 @@ func TestRootAndDiagramExposeSameGenerationFlags(t *testing.T) {
 		{name: "all-namespaces", shorthand: "A"},
 		{name: "output", shorthand: "o"},
 		{name: "image", shorthand: "i"},
+		{name: "kroki-base-url"},
+		{name: "kroki-timeout"},
 		{name: "include-storage"},
 		{name: "grid-columns"},
 		{name: "quiet", shorthand: "q"},
@@ -104,6 +108,50 @@ func TestImageFlagIsAcceptedOnRootAndDiagram(t *testing.T) {
 			}
 			if rootOptions.image != tt.want {
 				t.Fatalf("expected image flag to set %q, got %q", tt.want, rootOptions.image)
+			}
+		})
+	}
+}
+
+func TestKrokiFlagsAreAcceptedOnRootAndDiagram(t *testing.T) {
+	tests := []struct {
+		name        string
+		cmd         interface{ ParseFlags([]string) error }
+		args        []string
+		wantBaseURL string
+		wantTimeout time.Duration
+	}{
+		{
+			name:        "root",
+			cmd:         rootCmd,
+			args:        []string{"--kroki-base-url", "https://kroki.internal", "--kroki-timeout", "45s"},
+			wantBaseURL: "https://kroki.internal",
+			wantTimeout: 45 * time.Second,
+		},
+		{
+			name:        "diagram",
+			cmd:         diagramCmd,
+			args:        []string{"--kroki-base-url", "https://kroki.example.com/api", "--kroki-timeout", "2m"},
+			wantBaseURL: "https://kroki.example.com/api",
+			wantTimeout: 2 * time.Minute,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rootOptions.krokiBaseURL = kroki.DefaultBaseURL
+			rootOptions.krokiTimeout = kroki.DefaultTimeout
+
+			if err := tt.cmd.ParseFlags(tt.args); err != nil {
+				t.Fatalf("expected Kroki flags to parse: %v", err)
+			}
+
+			if rootOptions.krokiBaseURL != tt.wantBaseURL {
+				t.Fatalf("expected Kroki base URL %q, got %q", tt.wantBaseURL, rootOptions.krokiBaseURL)
+			}
+
+			if rootOptions.krokiTimeout != tt.wantTimeout {
+				t.Fatalf("expected Kroki timeout %s, got %s", tt.wantTimeout, rootOptions.krokiTimeout)
 			}
 		})
 	}
