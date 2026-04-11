@@ -45,6 +45,10 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return errors.New("flags --output/-o and --image/-i are mutually exclusive")
 	}
 
+	if err := validateImageOptions(); err != nil {
+		return err
+	}
+
 	client, err := createClientWithSpinner()
 	if err != nil {
 		return err
@@ -77,6 +81,23 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Info("D2 diagram generated successfully")
+	return nil
+}
+
+func validateImageOptions() error {
+	if rootOptions.image == "" {
+		return nil
+	}
+
+	rootOptions.krokiBaseURL = strings.TrimSpace(rootOptions.krokiBaseURL)
+	if rootOptions.krokiBaseURL == "" {
+		return errors.New("flag --kroki-base-url cannot be empty when using --image")
+	}
+
+	if rootOptions.krokiTimeout <= 0 {
+		return errors.New("flag --kroki-timeout must be greater than 0 when using --image")
+	}
+
 	return nil
 }
 
@@ -142,7 +163,10 @@ func generateImage(cluster *model.Cluster) error {
 
 	// Send to Kroki
 	var svgData []byte
-	krokiClient := kroki.NewClient()
+	krokiClient := kroki.NewClientWithOptions(kroki.Options{
+		BaseURL: rootOptions.krokiBaseURL,
+		Timeout: rootOptions.krokiTimeout,
+	})
 
 	if err := runWithSpinner("Generating SVG via Kroki...", func() error {
 		var krokiErr error

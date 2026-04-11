@@ -190,7 +190,7 @@ func TestFetchNamespaceAddsEntrypoints(t *testing.T) {
 			Name:     "api-service",
 			Kind:     "NodePort",
 			Services: []string{"api-service"},
-			Ports:    []model.Port{{Port: 8080, TargetPort: 8080, NodePort: 30080}},
+			Ports:    []model.Port{{Port: 8080, TargetPort: "8080", NodePort: 30080}},
 		},
 		"Ingress/public-edge": {
 			Name:     "public-edge",

@@ -54,7 +54,7 @@ type Entrypoint struct {
 type Port struct {
 	Name       string
 	Port       int32
-	TargetPort int32
+	TargetPort string // Numeric or named Kubernetes targetPort value.
 	NodePort   int32
 }
 

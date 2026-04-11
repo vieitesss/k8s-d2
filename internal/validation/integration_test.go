@@ -32,6 +32,10 @@ func TestD2Output_BasicFromEnv(t *testing.T) {
 		t.Errorf("Legend validation failed: %v", err)
 	}
 
+	if err := validator.ValidateExactRender(); err != nil {
+		t.Errorf("Exact render validation failed: %v", err)
+	}
+
 	if err := validator.ValidateResources(); err != nil {
 		t.Errorf("Resource validation failed: %v", err)
 	}
@@ -75,6 +79,10 @@ func TestD2Output_StorageFromEnv(t *testing.T) {
 
 	if err := validator.ValidateLegendStructure(); err != nil {
 		t.Errorf("Legend validation failed: %v", err)
+	}
+
+	if err := validator.ValidateExactRender(); err != nil {
+		t.Errorf("Exact render validation failed: %v", err)
 	}
 
 	if err := validator.ValidateResources(); err != nil {

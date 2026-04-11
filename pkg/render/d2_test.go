@@ -10,6 +10,26 @@ import (
 	"github.com/vieitesss/k8s-d2/pkg/model"
 )
 
+func TestFormatServicePortLabel(t *testing.T) {
+	tests := []struct {
+		name string
+		port model.Port
+		want string
+	}{
+		{name: "same target port omits arrow", port: model.Port{Port: 80, TargetPort: "80"}, want: "80"},
+		{name: "named target port kept", port: model.Port{Name: "http", Port: 80, TargetPort: "web"}, want: "http: 80 -> web"},
+		{name: "numeric target port kept", port: model.Port{Name: "metrics", Port: 9090, TargetPort: "9091"}, want: "metrics: 9090 -> 9091"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := model.FormatServicePortLabel(tt.port); got != tt.want {
+				t.Fatalf("FormatServicePortLabel(%+v) = %q, want %q", tt.port, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRenderLegend_IncludesOnlyRenderedResourceTypes(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -385,6 +405,11 @@ func TestRender_EscapesIdentifiersAndLabels(t *testing.T) {
 			Services: []model.Service{{
 				Name: "api.v2-service",
 				Type: "ClusterIP",
+				Ports: []model.Port{{
+					Name:       "http",
+					Port:       80,
+					TargetPort: "api-http",
+				}},
 				Selector: map[string]string{
 					"app.kubernetes.io/name": "api.v2",
 				},
@@ -417,7 +442,7 @@ func TestRender_EscapesIdentifiersAndLabels(t *testing.T) {
 	if !strings.Contains(output, fmt.Sprintf("label: %s", strconv.Quote("● api.v2 (3)"))) {
 		t.Fatalf("expected quoted workload label, output was:\n%s", output)
 	}
-	if !strings.Contains(output, fmt.Sprintf("label: %s", strconv.Quote("⎈ api.v2-service\nClusterIP"))) {
+	if !strings.Contains(output, fmt.Sprintf("label: %s", strconv.Quote("⎈ api.v2-service\nClusterIP\nhttp: 80 -> api-http"))) {
 		t.Fatalf("expected quoted service label with escaped newline, output was:\n%s", output)
 	}
 	if !strings.Contains(output, fmt.Sprintf("label: %s", strconv.Quote("⇢ edge.v2\nIngress [nginx.public]\napi.v2.example.com"))) {
@@ -431,6 +456,52 @@ func TestRender_EscapesIdentifiersAndLabels(t *testing.T) {
 	}
 	if !strings.Contains(output, fmt.Sprintf("%s -> %s", ServiceID("api.v2-service"), SanitizeID("api.v2"))) {
 		t.Fatalf("expected escaped service-to-workload edge, output was:\n%s", output)
+	}
+}
+
+func TestRender_DaemonSetLabelsOmitReplicaCounts(t *testing.T) {
+	cluster := &model.Cluster{
+		Namespaces: []model.Namespace{{
+			Name: "ops",
+			DaemonSets: []model.Workload{{
+				Name:     "node-agent",
+				Kind:     "DaemonSet",
+				Replicas: 7,
+			}},
+		}},
+	}
+
+	output := renderTestCluster(t, cluster)
+
+	if !strings.Contains(output, fmt.Sprintf("label: %s", strconv.Quote("◈ node-agent"))) {
+		t.Fatalf("expected daemonset label without replica count, output was:\n%s", output)
+	}
+	if strings.Contains(output, "◈ node-agent (") {
+		t.Fatalf("expected daemonset label to omit replica count, output was:\n%s", output)
+	}
+}
+
+func TestRender_IncludesServicePortsInLabels(t *testing.T) {
+	cluster := &model.Cluster{Namespaces: []model.Namespace{{
+		Name: "apps",
+		Services: []model.Service{{
+			Name: "api",
+			Type: "ClusterIP",
+			Ports: []model.Port{{
+				Name:       "http",
+				Port:       80,
+				TargetPort: "web",
+			}, {
+				Name:       "metrics",
+				Port:       9090,
+				TargetPort: "9090",
+			}},
+		}},
+	}}}
+
+	output := renderTestCluster(t, cluster)
+	if !strings.Contains(output, fmt.Sprintf("label: %s", strconv.Quote("⎈ api\nClusterIP\nhttp: 80 -> web\nmetrics: 9090"))) {
+		t.Fatalf("expected service ports in label, output was:\n%s", output)
 	}
 }
 

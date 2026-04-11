@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vieitesss/k8s-d2/pkg/model"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -213,5 +214,56 @@ func TestFetchNamespaceAllowsForbiddenIngressList(t *testing.T) {
 	}
 	if ns.Entrypoints[0].Kind != "NodePort" || ns.Entrypoints[0].Name != "api-service" {
 		t.Fatalf("unexpected entrypoints after forbidden ingress list: %#v", ns.Entrypoints)
+	}
+}
+
+func TestFetchServicesPreservesNamedTargetPorts(t *testing.T) {
+	client := &Client{clientset: fake.NewSimpleClientset(&corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: "apps"},
+		Spec: corev1.ServiceSpec{
+			Type:     corev1.ServiceTypeClusterIP,
+			Selector: map[string]string{"app": "api"},
+			Ports: []corev1.ServicePort{{
+				Name:       "http",
+				Port:       80,
+				TargetPort: intstr.FromString("web"),
+			}, {
+				Port: 443,
+			}},
+		},
+	})}
+
+	ns := &model.Namespace{Name: "apps"}
+	if err := client.fetchServices(context.Background(), "apps", ns); err != nil {
+		t.Fatalf("fetchServices returned error: %v", err)
+	}
+
+	if len(ns.Services) != 1 {
+		t.Fatalf("expected 1 service, got %d", len(ns.Services))
+	}
+
+	want := []model.Port{{Name: "http", Port: 80, TargetPort: "web"}, {Port: 443, TargetPort: "443"}}
+	if !reflect.DeepEqual(ns.Services[0].Ports, want) {
+		t.Fatalf("ports = %+v, want %+v", ns.Services[0].Ports, want)
+	}
+}
+
+func TestServiceTargetPort(t *testing.T) {
+	tests := []struct {
+		name string
+		port corev1.ServicePort
+		want string
+	}{
+		{name: "named target port", port: corev1.ServicePort{Port: 80, TargetPort: intstr.FromString("web")}, want: "web"},
+		{name: "numeric target port", port: corev1.ServicePort{Port: 80, TargetPort: intstr.FromInt32(8080)}, want: "8080"},
+		{name: "omitted target port defaults to service port", port: corev1.ServicePort{Port: 443}, want: "443"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ServiceTargetPort(tt.port); got != tt.want {
+				t.Fatalf("ServiceTargetPort(%+v) = %q, want %q", tt.port, got, tt.want)
+			}
+		})
 	}
 }

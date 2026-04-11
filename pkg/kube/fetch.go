@@ -222,7 +222,7 @@ func (c *Client) fetchServices(ctx context.Context, nsName string, ns *model.Nam
 			ports = append(ports, model.Port{
 				Name:       p.Name,
 				Port:       p.Port,
-				TargetPort: p.TargetPort.IntVal,
+				TargetPort: ServiceTargetPort(p),
 				NodePort:   p.NodePort,
 			})
 		}
