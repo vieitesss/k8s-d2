@@ -8,7 +8,7 @@ import (
 )
 
 func TestFixtureParser_ParseServicePreservesNamedTargetPort(t *testing.T) {
-	parser := validation.NewFixtureParser("apps")
+	parser := validation.NewFixtureParser("apps", false)
 	cluster, err := parser.ParseFixtures([][]byte{[]byte(`apiVersion: v1
 kind: Service
 metadata:

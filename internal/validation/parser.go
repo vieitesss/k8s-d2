@@ -2,6 +2,7 @@ package validation
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/vieitesss/k8s-d2/pkg/kube"
 	"github.com/vieitesss/k8s-d2/pkg/model"
@@ -12,12 +13,15 @@ import (
 
 // FixtureParser parses Kubernetes YAML fixtures into internal model types
 type FixtureParser struct {
-	namespace string
+	namespace      string
+	includeStorage bool
 }
 
-// NewFixtureParser creates a new FixtureParser for the given namespace
-func NewFixtureParser(namespace string) *FixtureParser {
-	return &FixtureParser{namespace: namespace}
+// NewFixtureParser creates a new FixtureParser for the given namespace.
+// When includeStorage is true, it also synthesizes StatefulSet-generated PVCs
+// so fixture-based expectations match the live cluster fetch path.
+func NewFixtureParser(namespace string, includeStorage bool) *FixtureParser {
+	return &FixtureParser{namespace: namespace, includeStorage: includeStorage}
 }
 
 // ParseFixtures reads multiple YAML fixture files and builds a Cluster model.
@@ -153,6 +157,10 @@ func (p *FixtureParser) parseStatefulSet(doc []byte, ns *model.Namespace) error 
 	}
 
 	ns.StatefulSets = append(ns.StatefulSets, workload)
+	if p.includeStorage {
+		ns.PVCs = append(ns.PVCs, statefulSetTemplatePVCs(&ss, replicas)...)
+	}
+
 	return nil
 }
 
@@ -230,6 +238,32 @@ func (p *FixtureParser) parsePVC(doc []byte, ns *model.Namespace) error {
 
 	ns.PVCs = append(ns.PVCs, pvcModel)
 	return nil
+}
+
+func statefulSetTemplatePVCs(ss *appsv1.StatefulSet, replicas int32) []model.PVC {
+	pvcs := make([]model.PVC, 0, len(ss.Spec.VolumeClaimTemplates)*int(replicas))
+
+	for _, template := range ss.Spec.VolumeClaimTemplates {
+		storageClass := ""
+		if template.Spec.StorageClassName != nil {
+			storageClass = *template.Spec.StorageClassName
+		}
+
+		capacity := ""
+		if storage, ok := template.Spec.Resources.Requests[corev1.ResourceStorage]; ok {
+			capacity = storage.String()
+		}
+
+		for i := range replicas {
+			pvcs = append(pvcs, model.PVC{
+				Name:         fmt.Sprintf("%s-%s-%d", template.Name, ss.Name, i),
+				StorageClass: storageClass,
+				Capacity:     capacity,
+			})
+		}
+	}
+
+	return pvcs
 }
 
 // parseConfigMap increments the ConfigMap count for the namespace
