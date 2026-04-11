@@ -50,6 +50,7 @@ func ApplyFixtures(
 		"base/04-statefulsets.yaml",
 		"base/05-daemonsets.yaml",
 		"base/06-services.yaml",
+		"base/07-ingress.yaml",
 	}
 
 	for _, fixture := range baseFixtures {

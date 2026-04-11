@@ -10,6 +10,7 @@ type Namespace struct {
 	Deployments  []Workload
 	StatefulSets []Workload
 	DaemonSets   []Workload
+	Entrypoints  []Entrypoint
 	Services     []Service
 	ConfigMaps   int
 	Secrets      int
@@ -39,10 +40,22 @@ type Service struct {
 	Ports    []Port
 }
 
+// Entrypoint represents traffic entering the cluster before it reaches a
+// Service, such as an Ingress or an externally exposed Service type.
+type Entrypoint struct {
+	Name     string
+	Kind     string // Ingress, NodePort, LoadBalancer
+	Class    string
+	Hosts    []string
+	Services []string
+	Ports    []Port
+}
+
 type Port struct {
 	Name       string
 	Port       int32
 	TargetPort string // Numeric or named Kubernetes targetPort value.
+	NodePort   int32
 }
 
 type PVC struct {

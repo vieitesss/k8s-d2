@@ -176,6 +176,47 @@ func TestGetNamespacesAllowsForbiddenNamespaceValidation(t *testing.T) {
 	}
 }
 
+func TestFetchNamespaceAllowsForbiddenIngressList(t *testing.T) {
+	clientset := fake.NewSimpleClientset(
+		&corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "api-service", Namespace: "apps"},
+			Spec: corev1.ServiceSpec{
+				Type: corev1.ServiceTypeNodePort,
+				Ports: []corev1.ServicePort{{
+					Port:       8080,
+					TargetPort: intstr.FromInt(8080),
+					NodePort:   30080,
+				}},
+			},
+		},
+	)
+
+	clientset.PrependReactor("list", "ingresses", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(
+			schema.GroupResource{Group: "networking.k8s.io", Resource: "ingresses"},
+			"apps",
+			errors.New("forbidden"),
+		)
+	})
+
+	client := &Client{clientset: clientset}
+
+	ns, err := client.fetchNamespace(context.Background(), "apps", FetchOptions{})
+	if err != nil {
+		t.Fatalf("expected forbidden ingress list to be tolerated, got %v", err)
+	}
+
+	if len(ns.Services) != 1 {
+		t.Fatalf("expected service fetch to continue, got %d services", len(ns.Services))
+	}
+	if len(ns.Entrypoints) != 1 {
+		t.Fatalf("expected service-derived entrypoint to remain available, got %d", len(ns.Entrypoints))
+	}
+	if ns.Entrypoints[0].Kind != "NodePort" || ns.Entrypoints[0].Name != "api-service" {
+		t.Fatalf("unexpected entrypoints after forbidden ingress list: %#v", ns.Entrypoints)
+	}
+}
+
 func TestFetchServicesPreservesNamedTargetPorts(t *testing.T) {
 	client := &Client{clientset: fake.NewSimpleClientset(&corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: "apps"},

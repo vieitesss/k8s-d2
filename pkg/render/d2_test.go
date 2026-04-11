@@ -51,7 +51,29 @@ func TestRenderLegend_IncludesOnlyRenderedResourceTypes(t *testing.T) {
 				}},
 			},
 			expected:   []string{"deployment"},
-			unexpected: []string{"statefulset", "daemonset", "service", "config", "pvc"},
+			unexpected: []string{"statefulset", "daemonset", "entrypoint", "service", "config", "pvc"},
+			wantLegend: true,
+		},
+		{
+			name: "entrypoint and service",
+			cluster: &model.Cluster{
+				Namespaces: []model.Namespace{{
+					Name: "apps",
+					Entrypoints: []model.Entrypoint{{
+						Name:     "public-edge",
+						Kind:     "Ingress",
+						Class:    "nginx",
+						Hosts:    []string{"apps.example.com"},
+						Services: []string{"web-service"},
+					}},
+					Services: []model.Service{{
+						Name: "web-service",
+						Type: "ClusterIP",
+					}},
+				}},
+			},
+			expected:   []string{"entrypoint", "service"},
+			unexpected: []string{"deployment", "statefulset", "daemonset", "config", "pvc"},
 			wantLegend: true,
 		},
 		{
@@ -67,7 +89,7 @@ func TestRenderLegend_IncludesOnlyRenderedResourceTypes(t *testing.T) {
 				}},
 			},
 			expected:   []string{"service", "config"},
-			unexpected: []string{"deployment", "statefulset", "daemonset", "pvc"},
+			unexpected: []string{"deployment", "statefulset", "daemonset", "entrypoint", "pvc"},
 			wantLegend: true,
 		},
 		{
@@ -81,7 +103,7 @@ func TestRenderLegend_IncludesOnlyRenderedResourceTypes(t *testing.T) {
 				}},
 			},
 			expected:   []string{"pvc"},
-			unexpected: []string{"deployment", "statefulset", "daemonset", "service", "config"},
+			unexpected: []string{"deployment", "statefulset", "daemonset", "entrypoint", "service", "config"},
 			wantLegend: true,
 		},
 		{
@@ -91,7 +113,7 @@ func TestRenderLegend_IncludesOnlyRenderedResourceTypes(t *testing.T) {
 					Name: "empty",
 				}},
 			},
-			unexpected: []string{"deployment", "statefulset", "daemonset", "service", "config", "pvc"},
+			unexpected: []string{"deployment", "statefulset", "daemonset", "entrypoint", "service", "config", "pvc"},
 			wantLegend: false,
 		},
 	}
@@ -193,6 +215,10 @@ func TestRender_SortsNamespacesAndResourcesDeterministically(t *testing.T) {
 					{Name: "z-agent", Kind: "DaemonSet", Replicas: 3},
 					{Name: "a-agent", Kind: "DaemonSet", Replicas: 3},
 				},
+				Entrypoints: []model.Entrypoint{
+					{Name: "z-edge", Kind: "NodePort", Services: []string{"z-service"}},
+					{Name: "a-edge", Kind: "Ingress", Services: []string{"a-service"}},
+				},
 				Services: []model.Service{
 					{Name: "z-service", Type: "ClusterIP"},
 					{Name: "a-service", Type: "ClusterIP"},
@@ -226,13 +252,66 @@ func TestRender_SortsNamespacesAndResourcesDeterministically(t *testing.T) {
 		fmt.Sprintf("  %s: {", SanitizeID("z-agent")),
 	)
 	assertAppearsInOrder(t, alphaBlock,
+		fmt.Sprintf("  %s: {", EntrypointID("Ingress", "a-edge")),
+		fmt.Sprintf("  %s: {", EntrypointID("NodePort", "z-edge")),
+	)
+	assertAppearsInOrder(t, alphaBlock,
 		fmt.Sprintf("  %s: {", ServiceID("a-service")),
 		fmt.Sprintf("  %s: {", ServiceID("z-service")),
+	)
+	assertAppearsInOrder(t, alphaBlock,
+		fmt.Sprintf("  %s: {", EntrypointID("NodePort", "z-edge")),
+		fmt.Sprintf("  %s: {", ServiceID("a-service")),
 	)
 	assertAppearsInOrder(t, alphaBlock,
 		fmt.Sprintf("  %s: {", PVCID("a-data")),
 		fmt.Sprintf("  %s: {", PVCID("z-data")),
 	)
+}
+
+func TestRender_RendersEntrypointLabelsAndConnections(t *testing.T) {
+	cluster := &model.Cluster{
+		Namespaces: []model.Namespace{{
+			Name: "apps",
+			Entrypoints: []model.Entrypoint{
+				{
+					Name:     "public-edge",
+					Kind:     "Ingress",
+					Class:    "nginx",
+					Hosts:    []string{"api.example.com", "www.example.com"},
+					Services: []string{"api-service", "web-service"},
+				},
+				{
+					Name:     "api-service",
+					Kind:     "NodePort",
+					Services: []string{"api-service"},
+					Ports:    []model.Port{{NodePort: 30080}},
+				},
+			},
+			Services: []model.Service{
+				{Name: "api-service", Type: "NodePort"},
+				{Name: "web-service", Type: "ClusterIP"},
+			},
+		}},
+	}
+
+	output := renderTestCluster(t, cluster)
+
+	if !strings.Contains(output, fmt.Sprintf("label: %s", strconv.Quote("⇢ public-edge\nIngress [nginx]\napi.example.com, www.example.com"))) {
+		t.Fatalf("expected ingress entrypoint label, output was:\n%s", output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("label: %s", strconv.Quote("⇢ api-service\nNodePort\n30080"))) {
+		t.Fatalf("expected nodeport entrypoint label, output was:\n%s", output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("%s -> %s", EntrypointID("Ingress", "public-edge"), ServiceID("api-service"))) {
+		t.Fatalf("expected ingress to service connection, output was:\n%s", output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("%s -> %s", EntrypointID("Ingress", "public-edge"), ServiceID("web-service"))) {
+		t.Fatalf("expected ingress to second service connection, output was:\n%s", output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("%s -> %s", EntrypointID("NodePort", "api-service"), ServiceID("api-service"))) {
+		t.Fatalf("expected nodeport to service connection, output was:\n%s", output)
+	}
 }
 
 func TestRender_SortsWorkloadPVCConnectionsDeterministically(t *testing.T) {
@@ -308,6 +387,13 @@ func TestRender_EscapesIdentifiersAndLabels(t *testing.T) {
 	cluster := &model.Cluster{
 		Namespaces: []model.Namespace{{
 			Name: "team.alpha",
+			Entrypoints: []model.Entrypoint{{
+				Name:     "edge.v2",
+				Kind:     "Ingress",
+				Class:    "nginx.public",
+				Hosts:    []string{"api.v2.example.com"},
+				Services: []string{"api.v2-service"},
+			}},
 			Deployments: []model.Workload{{
 				Name:     "api.v2",
 				Kind:     "Deployment",
@@ -347,6 +433,9 @@ func TestRender_EscapesIdentifiersAndLabels(t *testing.T) {
 	if !strings.Contains(output, fmt.Sprintf("  %s: {", ServiceID("api.v2-service"))) {
 		t.Fatalf("expected escaped service identifier, output was:\n%s", output)
 	}
+	if !strings.Contains(output, fmt.Sprintf("  %s: {", EntrypointID("Ingress", "edge.v2"))) {
+		t.Fatalf("expected escaped entrypoint identifier, output was:\n%s", output)
+	}
 	if !strings.Contains(output, fmt.Sprintf("  %s: {", PVCID("cache.data"))) {
 		t.Fatalf("expected escaped pvc identifier, output was:\n%s", output)
 	}
@@ -356,8 +445,14 @@ func TestRender_EscapesIdentifiersAndLabels(t *testing.T) {
 	if !strings.Contains(output, fmt.Sprintf("label: %s", strconv.Quote("⎈ api.v2-service\nClusterIP\nhttp: 80 -> api-http"))) {
 		t.Fatalf("expected quoted service label with escaped newline, output was:\n%s", output)
 	}
+	if !strings.Contains(output, fmt.Sprintf("label: %s", strconv.Quote("⇢ edge.v2\nIngress [nginx.public]\napi.v2.example.com"))) {
+		t.Fatalf("expected quoted entrypoint label with escaped newline, output was:\n%s", output)
+	}
 	if !strings.Contains(output, fmt.Sprintf("label: %s", strconv.Quote("💾 cache.data\n10Gi\n[fast.ssd]"))) {
 		t.Fatalf("expected quoted pvc label with escaped newline, output was:\n%s", output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("%s -> %s", EntrypointID("Ingress", "edge.v2"), ServiceID("api.v2-service"))) {
+		t.Fatalf("expected escaped entrypoint-to-service edge, output was:\n%s", output)
 	}
 	if !strings.Contains(output, fmt.Sprintf("%s -> %s", ServiceID("api.v2-service"), SanitizeID("api.v2"))) {
 		t.Fatalf("expected escaped service-to-workload edge, output was:\n%s", output)
