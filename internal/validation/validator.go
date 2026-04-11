@@ -90,8 +90,9 @@ func (v *D2Validator) ValidateExactRender() error {
 		return fmt.Errorf("render expected topology: %w", err)
 	}
 
-	if expected.String() != v.actual {
-		return fmt.Errorf("actual D2 output does not match exact renderer output")
+	expectedOutput := expected.String()
+	if expectedOutput != v.actual {
+		return exactRenderMismatch(expectedOutput, v.actual)
 	}
 
 	return nil
@@ -100,11 +101,16 @@ func (v *D2Validator) ValidateExactRender() error {
 // ValidateResources checks that all expected resources are present in the D2 output
 func (v *D2Validator) ValidateResources() error {
 	for _, ns := range v.expected.Namespaces {
+		namespaceBlock, err := extractNamespaceBlock(v.actual, ns.Name)
+		if err != nil {
+			return err
+		}
+
 		nsID := render.SanitizeID(ns.Name)
-		if !containsD2Line(v.actual, fmt.Sprintf("%s: {", nsID)) {
+		if !containsD2Line(namespaceBlock, fmt.Sprintf("%s: {", nsID)) {
 			return fmt.Errorf("missing namespace: %s", ns.Name)
 		}
-		if !containsD2Line(v.actual, fmt.Sprintf("label: %s", render.QuoteString(ns.Name))) {
+		if !containsD2Line(namespaceBlock, fmt.Sprintf("label: %s", render.QuoteString(ns.Name))) {
 			return fmt.Errorf("incorrect namespace label for %s", ns.Name)
 		}
 
@@ -115,27 +121,27 @@ func (v *D2Validator) ValidateResources() error {
 
 		for _, w := range allWorkloads {
 			wID := render.SanitizeID(w.Name)
-			if !containsD2Line(v.actual, fmt.Sprintf("%s: {", wID)) {
+			if !containsD2Line(namespaceBlock, fmt.Sprintf("%s: {", wID)) {
 				return fmt.Errorf("missing workload: %s (%s)", w.Name, w.Kind)
 			}
 		}
 
 		for _, svc := range ns.Services {
 			svcID := render.ServiceID(svc.Name)
-			if !containsD2Line(v.actual, fmt.Sprintf("%s: {", svcID)) {
+			if !containsD2Line(namespaceBlock, fmt.Sprintf("%s: {", svcID)) {
 				return fmt.Errorf("missing service: %s", svc.Name)
 			}
 		}
 
 		for _, pvc := range ns.PVCs {
 			pvcID := render.PVCID(pvc.Name)
-			if !containsD2Line(v.actual, fmt.Sprintf("%s: {", pvcID)) {
+			if !containsD2Line(namespaceBlock, fmt.Sprintf("%s: {", pvcID)) {
 				return fmt.Errorf("missing PVC: %s", pvc.Name)
 			}
 		}
 
 		if ns.ConfigMaps > 0 || ns.Secrets > 0 {
-			if !containsD2Line(v.actual, "_config: {") {
+			if !containsD2Line(namespaceBlock, "_config: {") {
 				return fmt.Errorf("missing config node for namespace: %s", ns.Name)
 			}
 		}
@@ -147,6 +153,11 @@ func (v *D2Validator) ValidateResources() error {
 // ValidateWorkloadLabels checks that workload labels have correct icons and replica counts
 func (v *D2Validator) ValidateWorkloadLabels() error {
 	for _, ns := range v.expected.Namespaces {
+		namespaceBlock, err := extractNamespaceBlock(v.actual, ns.Name)
+		if err != nil {
+			return err
+		}
+
 		// Check deployments and statefulsets (they have replica counts)
 		workloadsWithReplicas := []model.Workload{}
 		workloadsWithReplicas = append(workloadsWithReplicas, ns.Deployments...)
@@ -154,14 +165,14 @@ func (v *D2Validator) ValidateWorkloadLabels() error {
 
 		for _, w := range workloadsWithReplicas {
 			expectedLabel := render.WorkloadLabel(w)
-			if !containsD2Line(v.actual, fmt.Sprintf("label: %s", render.QuoteString(expectedLabel))) {
+			if !containsD2Line(namespaceBlock, fmt.Sprintf("label: %s", render.QuoteString(expectedLabel))) {
 				return fmt.Errorf("incorrect label for %s (expected: %s)", w.Name, expectedLabel)
 			}
 		}
 
 		for _, w := range ns.DaemonSets {
 			expectedLabel := render.WorkloadLabel(w)
-			if !containsD2Line(v.actual, fmt.Sprintf("label: %s", render.QuoteString(expectedLabel))) {
+			if !containsD2Line(namespaceBlock, fmt.Sprintf("label: %s", render.QuoteString(expectedLabel))) {
 				return fmt.Errorf("incorrect label for %s (expected: %s)", w.Name, expectedLabel)
 			}
 		}
@@ -173,12 +184,17 @@ func (v *D2Validator) ValidateWorkloadLabels() error {
 // ValidateServiceConnections checks that service-to-workload connections exist
 func (v *D2Validator) ValidateServiceConnections() error {
 	for _, ns := range v.expected.Namespaces {
+		namespaceBlock, err := extractNamespaceBlock(v.actual, ns.Name)
+		if err != nil {
+			return err
+		}
+
 		connections := v.deriver.ServiceToWorkloadConnections(&ns)
 		sortConnections(connections)
 
 		for _, conn := range connections {
 			connectionStr := fmt.Sprintf("%s -> %s", conn.From, conn.To)
-			if !containsD2Line(v.actual, connectionStr) {
+			if !containsD2Line(namespaceBlock, connectionStr) {
 				return fmt.Errorf("missing expected connection: %s -> %s", conn.From, conn.To)
 			}
 		}
@@ -195,18 +211,23 @@ func (v *D2Validator) ValidatePVCConnections() error {
 			continue
 		}
 
+		namespaceBlock, err := extractNamespaceBlock(v.actual, ns.Name)
+		if err != nil {
+			return err
+		}
+
 		connections := v.deriver.WorkloadToPVCConnections(&ns)
 		sortConnections(connections)
 
 		for _, conn := range connections {
 			baseConnectionStr := fmt.Sprintf("%s -> %s", conn.From, conn.To)
-			if !containsD2LinePrefix(v.actual, baseConnectionStr) {
+			if !containsD2LinePrefix(namespaceBlock, baseConnectionStr) {
 				return fmt.Errorf("missing workload-to-PVC connection: %s -> %s", conn.From, conn.To)
 			}
 
 			if conn.Label != "" {
 				fullConnectionStr := fmt.Sprintf("%s: %s", baseConnectionStr, render.QuoteString(conn.Label))
-				if !containsD2Line(v.actual, fullConnectionStr) {
+				if !containsD2Line(namespaceBlock, fullConnectionStr) {
 					return fmt.Errorf(
 						"connection %s missing expected mount metadata: %s",
 						fmt.Sprintf("%s -> %s", conn.From, conn.To),
@@ -227,14 +248,53 @@ func (v *D2Validator) ValidateConfigInfo() error {
 			continue
 		}
 
+		namespaceBlock, err := extractNamespaceBlock(v.actual, ns.Name)
+		if err != nil {
+			return err
+		}
+
 		expectedLabel := fmt.Sprintf("label: %s", render.QuoteString(fmt.Sprintf("CM: %d | Sec: %d", ns.ConfigMaps, ns.Secrets)))
 
-		if !containsD2Line(v.actual, expectedLabel) {
-			return fmt.Errorf("incorrect ConfigMap count for namespace %s (expected: %d)", ns.Name, ns.ConfigMaps)
+		if !containsD2Line(namespaceBlock, expectedLabel) {
+			return fmt.Errorf("incorrect config info for namespace %s (expected label: %s)", ns.Name, expectedLabel)
 		}
 	}
 
 	return nil
+}
+
+func exactRenderMismatch(expected, actual string) error {
+	expectedLines := strings.Split(expected, "\n")
+	actualLines := strings.Split(actual, "\n")
+	lineCount := len(expectedLines)
+	if len(actualLines) > lineCount {
+		lineCount = len(actualLines)
+	}
+
+	for i := 0; i < lineCount; i++ {
+		expectedLine := "<missing>"
+		actualLine := "<missing>"
+		if i < len(expectedLines) {
+			expectedLine = expectedLines[i]
+		}
+		if i < len(actualLines) {
+			actualLine = actualLines[i]
+		}
+		if expectedLine != actualLine {
+			return fmt.Errorf(
+				"actual D2 output does not match exact renderer output: first difference at line %d (expected %q, actual %q)",
+				i+1,
+				expectedLine,
+				actualLine,
+			)
+		}
+	}
+
+	return fmt.Errorf(
+		"actual D2 output does not match exact renderer output: expected %d bytes, actual %d bytes",
+		len(expected),
+		len(actual),
+	)
 }
 
 func sortConnections(connections []Connection) {
@@ -267,6 +327,19 @@ func containsD2LinePrefix(input, prefix string) bool {
 	}
 
 	return false
+}
+
+func extractNamespaceBlock(input, namespaceName string) (string, error) {
+	nsID := render.SanitizeID(namespaceName)
+	block, err := extractD2Block(input, fmt.Sprintf("  %s: {", nsID))
+	if err != nil {
+		if strings.Contains(err.Error(), "missing") {
+			return "", fmt.Errorf("missing namespace: %s", namespaceName)
+		}
+		return "", fmt.Errorf("invalid namespace block for %s: %w", namespaceName, err)
+	}
+
+	return block, nil
 }
 
 func extractD2Block(input, marker string) (string, error) {
