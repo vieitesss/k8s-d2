@@ -206,3 +206,23 @@ func TestFetchServicesPreservesNamedTargetPorts(t *testing.T) {
 		t.Fatalf("ports = %+v, want %+v", ns.Services[0].Ports, want)
 	}
 }
+
+func TestServiceTargetPort(t *testing.T) {
+	tests := []struct {
+		name string
+		port corev1.ServicePort
+		want string
+	}{
+		{name: "named target port", port: corev1.ServicePort{Port: 80, TargetPort: intstr.FromString("web")}, want: "web"},
+		{name: "numeric target port", port: corev1.ServicePort{Port: 80, TargetPort: intstr.FromInt32(8080)}, want: "8080"},
+		{name: "omitted target port defaults to service port", port: corev1.ServicePort{Port: 443}, want: "443"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ServiceTargetPort(tt.port); got != tt.want {
+				t.Fatalf("ServiceTargetPort(%+v) = %q, want %q", tt.port, got, tt.want)
+			}
+		})
+	}
+}
