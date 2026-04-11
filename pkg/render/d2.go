@@ -179,10 +179,9 @@ func (r *D2Renderer) writePVCs(b *strings.Builder, ns *model.Namespace, indent s
 
 func (r *D2Renderer) writeWorkload(b *strings.Builder, w *model.Workload, indent string) {
 	wID := SanitizeID(w.Name)
-	icon := WorkloadIcon(w.Kind)
 
 	fmt.Fprintf(b, "%s  %s: {\n", indent, wID)
-	fmt.Fprintf(b, "%s    label: %s\n", indent, QuoteString(fmt.Sprintf("%s %s (%d)", icon, w.Name, w.Replicas)))
+	fmt.Fprintf(b, "%s    label: %s\n", indent, QuoteString(WorkloadLabel(*w)))
 	fmt.Fprintf(b, "%s  }\n", indent)
 }
 
@@ -412,6 +411,16 @@ func WorkloadIcon(kind string) string {
 	default:
 		return "●"
 	}
+}
+
+// WorkloadLabel returns the rendered label for a workload node.
+func WorkloadLabel(w model.Workload) string {
+	icon := WorkloadIcon(w.Kind)
+	if w.Kind == "DaemonSet" {
+		return fmt.Sprintf("%s %s", icon, w.Name)
+	}
+
+	return fmt.Sprintf("%s %s (%d)", icon, w.Name, w.Replicas)
 }
 
 // LabelsMatch checks if a selector matches a set of labels.

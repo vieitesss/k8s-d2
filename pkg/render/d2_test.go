@@ -339,6 +339,28 @@ func TestRender_EscapesIdentifiersAndLabels(t *testing.T) {
 	}
 }
 
+func TestRender_DaemonSetLabelsOmitReplicaCounts(t *testing.T) {
+	cluster := &model.Cluster{
+		Namespaces: []model.Namespace{{
+			Name: "ops",
+			DaemonSets: []model.Workload{{
+				Name:     "node-agent",
+				Kind:     "DaemonSet",
+				Replicas: 7,
+			}},
+		}},
+	}
+
+	output := renderTestCluster(t, cluster)
+
+	if !strings.Contains(output, fmt.Sprintf("label: %s", strconv.Quote("◈ node-agent"))) {
+		t.Fatalf("expected daemonset label without replica count, output was:\n%s", output)
+	}
+	if strings.Contains(output, "◈ node-agent (") {
+		t.Fatalf("expected daemonset label to omit replica count, output was:\n%s", output)
+	}
+}
+
 func TestSanitizeID_AvoidsLossyCollisions(t *testing.T) {
 	first := SanitizeID("api-v2")
 	second := SanitizeID("api_v2")
