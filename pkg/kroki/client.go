@@ -33,7 +33,7 @@ func NewClient() *Client {
 
 // NewClientWithOptions creates a new Kroki client with explicit configuration.
 func NewClientWithOptions(opts Options) *Client {
-	baseURL := opts.BaseURL
+	baseURL := strings.TrimSpace(opts.BaseURL)
 	if baseURL == "" {
 		baseURL = DefaultBaseURL
 	}

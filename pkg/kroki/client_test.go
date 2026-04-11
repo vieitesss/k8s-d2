@@ -21,7 +21,7 @@ func TestNewClientDefaults(t *testing.T) {
 
 func TestNewClientUsesConfiguredBaseURLAndTimeout(t *testing.T) {
 	client := NewClientWithOptions(Options{
-		BaseURL: "https://kroki.internal/",
+		BaseURL: "  https://kroki.internal/  ",
 		Timeout: 45 * time.Second,
 	})
 

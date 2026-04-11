@@ -89,7 +89,8 @@ func validateImageOptions() error {
 		return nil
 	}
 
-	if strings.TrimSpace(rootOptions.krokiBaseURL) == "" {
+	rootOptions.krokiBaseURL = strings.TrimSpace(rootOptions.krokiBaseURL)
+	if rootOptions.krokiBaseURL == "" {
 		return errors.New("flag --kroki-base-url cannot be empty when using --image")
 	}
 

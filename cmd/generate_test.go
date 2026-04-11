@@ -35,6 +35,14 @@ func TestValidateImageOptions(t *testing.T) {
 			wantErr: "flag --kroki-base-url cannot be empty when using --image",
 		},
 		{
+			name: "base URL is trimmed before use",
+			options: RootOptions{
+				image:        "cluster.svg",
+				krokiBaseURL: "  https://kroki.internal  ",
+				krokiTimeout: time.Second,
+			},
+		},
+		{
 			name: "non-positive timeout is rejected for image generation",
 			options: RootOptions{
 				image:        "cluster.svg",
@@ -57,6 +65,9 @@ func TestValidateImageOptions(t *testing.T) {
 			if tt.wantErr == "" {
 				if err != nil {
 					t.Fatalf("expected no error, got %v", err)
+				}
+				if tt.options.image != "" && strings.TrimSpace(tt.options.krokiBaseURL) != "" && rootOptions.krokiBaseURL != strings.TrimSpace(tt.options.krokiBaseURL) {
+					t.Fatalf("expected Kroki base URL to be trimmed to %q, got %q", strings.TrimSpace(tt.options.krokiBaseURL), rootOptions.krokiBaseURL)
 				}
 				return
 			}
@@ -97,7 +108,7 @@ func TestGenerateImageUsesConfiguredKrokiBaseURL(t *testing.T) {
 	})
 
 	rootOptions.image = outputFile
-	rootOptions.krokiBaseURL = server.URL + "/"
+	rootOptions.krokiBaseURL = "  " + server.URL + "/  "
 	rootOptions.krokiTimeout = time.Second
 	rootOptions.quiet = true
 
