@@ -42,7 +42,7 @@ type Service struct {
 type Port struct {
 	Name       string
 	Port       int32
-	TargetPort int32
+	TargetPort string // Numeric or named Kubernetes targetPort value.
 }
 
 type PVC struct {

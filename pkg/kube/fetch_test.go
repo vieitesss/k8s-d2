@@ -7,11 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vieitesss/k8s-d2/pkg/model"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 )
@@ -171,5 +173,36 @@ func TestGetNamespacesAllowsForbiddenNamespaceValidation(t *testing.T) {
 	want := []string{"default", "restricted"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("getNamespaces returned %v, want %v", got, want)
+	}
+}
+
+func TestFetchServicesPreservesNamedTargetPorts(t *testing.T) {
+	client := &Client{clientset: fake.NewSimpleClientset(&corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: "apps"},
+		Spec: corev1.ServiceSpec{
+			Type:     corev1.ServiceTypeClusterIP,
+			Selector: map[string]string{"app": "api"},
+			Ports: []corev1.ServicePort{{
+				Name:       "http",
+				Port:       80,
+				TargetPort: intstr.FromString("web"),
+			}, {
+				Port: 443,
+			}},
+		},
+	})}
+
+	ns := &model.Namespace{Name: "apps"}
+	if err := client.fetchServices(context.Background(), "apps", ns); err != nil {
+		t.Fatalf("fetchServices returned error: %v", err)
+	}
+
+	if len(ns.Services) != 1 {
+		t.Fatalf("expected 1 service, got %d", len(ns.Services))
+	}
+
+	want := []model.Port{{Name: "http", Port: 80, TargetPort: "web"}, {Port: 443, TargetPort: "443"}}
+	if !reflect.DeepEqual(ns.Services[0].Ports, want) {
+		t.Fatalf("ports = %+v, want %+v", ns.Services[0].Ports, want)
 	}
 }

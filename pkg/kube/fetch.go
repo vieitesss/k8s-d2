@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/vieitesss/k8s-d2/pkg/model"
@@ -218,10 +219,18 @@ func (c *Client) fetchServices(ctx context.Context, nsName string, ns *model.Nam
 	for _, svc := range svcs.Items {
 		ports := []model.Port{}
 		for _, p := range svc.Spec.Ports {
+			targetPort := p.TargetPort.StrVal
+			if targetPort == "" {
+				if p.TargetPort.IntVal != 0 {
+					targetPort = strconv.FormatInt(int64(p.TargetPort.IntVal), 10)
+				} else {
+					targetPort = strconv.FormatInt(int64(p.Port), 10)
+				}
+			}
 			ports = append(ports, model.Port{
 				Name:       p.Name,
 				Port:       p.Port,
-				TargetPort: p.TargetPort.IntVal,
+				TargetPort: targetPort,
 			})
 		}
 		ns.Services = append(ns.Services, model.Service{

@@ -19,3 +19,26 @@ func FormatMountLabel(mounts []VolumeMount) string {
 	}
 	return strings.Join(labels, "\n")
 }
+
+// FormatServicePortLabel creates a compact label for a single service port.
+// Examples: "80", "http: 80 -> web", "metrics: 9090 -> 9091".
+func FormatServicePortLabel(port Port) string {
+	portValue := fmt.Sprintf("%d", port.Port)
+	label := portValue
+	if port.Name != "" {
+		label = fmt.Sprintf("%s: %s", port.Name, portValue)
+	}
+	if port.TargetPort != "" && port.TargetPort != portValue {
+		label = fmt.Sprintf("%s -> %s", label, port.TargetPort)
+	}
+	return label
+}
+
+// FormatServicePortsLabel joins multiple service ports in render order.
+func FormatServicePortsLabel(ports []Port) string {
+	labels := make([]string, len(ports))
+	for i, port := range ports {
+		labels[i] = FormatServicePortLabel(port)
+	}
+	return strings.Join(labels, "\n")
+}

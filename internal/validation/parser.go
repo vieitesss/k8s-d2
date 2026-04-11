@@ -2,6 +2,7 @@ package validation
 
 import (
 	"bytes"
+	"strconv"
 
 	"github.com/vieitesss/k8s-d2/pkg/kube"
 	"github.com/vieitesss/k8s-d2/pkg/model"
@@ -193,11 +194,19 @@ func (p *FixtureParser) parseService(doc []byte, ns *model.Namespace) error {
 		Selector: svc.Spec.Selector,
 	}
 
-	// Add ports if needed in the future
 	for _, port := range svc.Spec.Ports {
+		targetPort := port.TargetPort.StrVal
+		if targetPort == "" {
+			if port.TargetPort.IntVal != 0 {
+				targetPort = strconv.FormatInt(int64(port.TargetPort.IntVal), 10)
+			} else {
+				targetPort = strconv.FormatInt(int64(port.Port), 10)
+			}
+		}
 		service.Ports = append(service.Ports, model.Port{
+			Name:       port.Name,
 			Port:       port.Port,
-			TargetPort: port.TargetPort.IntVal,
+			TargetPort: targetPort,
 		})
 	}
 
