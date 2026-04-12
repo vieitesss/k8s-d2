@@ -147,14 +147,8 @@ func (r *D2Renderer) renderNamespaceIndented(ns *model.Namespace, indent string)
 }
 
 func (r *D2Renderer) writeAllWorkloads(b *strings.Builder, ns *model.Namespace, indent string) {
-	for _, w := range ns.Deployments {
-		r.writeWorkload(b, &w, indent)
-	}
-	for _, w := range ns.StatefulSets {
-		r.writeWorkload(b, &w, indent)
-	}
-	for _, w := range ns.DaemonSets {
-		r.writeWorkload(b, &w, indent)
+	for _, w := range model.AllWorkloads(ns) {
+		r.writeWorkload(b, w, indent)
 	}
 }
 
@@ -196,11 +190,11 @@ func (r *D2Renderer) writePVCs(b *strings.Builder, ns *model.Namespace, indent s
 	}
 }
 
-func (r *D2Renderer) writeWorkload(b *strings.Builder, w *model.Workload, indent string) {
-	wID := SanitizeID(w.Name)
+func (r *D2Renderer) writeWorkload(b *strings.Builder, w model.Workload, indent string) {
+	wID := WorkloadID(w)
 
 	fmt.Fprintf(b, "%s  %s: {\n", indent, wID)
-	fmt.Fprintf(b, "%s    label: %s\n", indent, QuoteString(WorkloadLabel(*w)))
+	fmt.Fprintf(b, "%s    label: %s\n", indent, QuoteString(WorkloadLabel(w)))
 	fmt.Fprintf(b, "%s  }\n", indent)
 }
 
@@ -228,49 +222,46 @@ func (r *D2Renderer) writeEntrypoint(b *strings.Builder, entrypoint *model.Entry
 
 func (r *D2Renderer) writeConnections(b *strings.Builder, ns *model.Namespace, indent string) {
 	r.writeEntrypointConnections(b, ns, indent)
+	workloads := model.AllWorkloads(ns)
 
 	for _, svc := range ns.Services {
 		if len(svc.Selector) == 0 {
 			continue
 		}
-		r.writeServiceConnections(b, &svc, ns, indent)
+		r.writeServiceConnections(b, &svc, workloads, indent)
 	}
 
 	// Only render workload-to-PVC connections if PVCs are actually present
 	if len(ns.PVCs) > 0 {
-		r.writeWorkloadPVCConnections(b, ns, indent)
+		r.writeWorkloadPVCConnections(b, workloads, indent)
 	}
 }
 
-func (r *D2Renderer) writeWorkloadPVCConnections(b *strings.Builder, ns *model.Namespace, indent string) {
-	workloadGroups := [][]model.Workload{ns.Deployments, ns.StatefulSets, ns.DaemonSets}
+func (r *D2Renderer) writeWorkloadPVCConnections(b *strings.Builder, workloads []model.Workload, indent string) {
+	for _, w := range workloads {
+		if len(w.VolumeMounts) == 0 {
+			continue
+		}
 
-	for _, workloads := range workloadGroups {
-		for _, w := range workloads {
-			if len(w.VolumeMounts) == 0 {
-				continue
-			}
+		workloadID := WorkloadID(w)
 
-			workloadID := SanitizeID(w.Name)
+		// Group mounts by PVC (handle case where same PVC mounted at multiple paths)
+		mountsByPVC := make(map[string][]model.VolumeMount)
+		for _, mount := range w.VolumeMounts {
+			mountsByPVC[mount.PVCName] = append(mountsByPVC[mount.PVCName], mount)
+		}
 
-			// Group mounts by PVC (handle case where same PVC mounted at multiple paths)
-			mountsByPVC := make(map[string][]model.VolumeMount)
-			for _, mount := range w.VolumeMounts {
-				mountsByPVC[mount.PVCName] = append(mountsByPVC[mount.PVCName], mount)
-			}
+		pvcNames := make([]string, 0, len(mountsByPVC))
+		for pvcName := range mountsByPVC {
+			pvcNames = append(pvcNames, pvcName)
+		}
+		sort.Strings(pvcNames)
 
-			pvcNames := make([]string, 0, len(mountsByPVC))
-			for pvcName := range mountsByPVC {
-				pvcNames = append(pvcNames, pvcName)
-			}
-			sort.Strings(pvcNames)
-
-			for _, pvcName := range pvcNames {
-				mounts := mountsByPVC[pvcName]
-				pvcID := PVCID(pvcName)
-				label := model.FormatMountLabel(mounts)
-				fmt.Fprintf(b, "%s  %s -> %s: %s\n", indent, workloadID, pvcID, QuoteString(label))
-			}
+		for _, pvcName := range pvcNames {
+			mounts := mountsByPVC[pvcName]
+			pvcID := PVCID(pvcName)
+			label := model.FormatMountLabel(mounts)
+			fmt.Fprintf(b, "%s  %s -> %s: %s\n", indent, workloadID, pvcID, QuoteString(label))
 		}
 	}
 }
@@ -290,16 +281,12 @@ func (r *D2Renderer) writeEntrypointConnections(b *strings.Builder, ns *model.Na
 	}
 }
 
-func (r *D2Renderer) writeServiceConnections(b *strings.Builder, svc *model.Service, ns *model.Namespace, indent string) {
+func (r *D2Renderer) writeServiceConnections(b *strings.Builder, svc *model.Service, workloads []model.Workload, indent string) {
 	svcID := ServiceID(svc.Name)
-	allWorkloads := [][]model.Workload{ns.Deployments, ns.StatefulSets, ns.DaemonSets}
 
-	for _, workloads := range allWorkloads {
-		for _, w := range workloads {
-			if LabelsMatch(svc.Selector, w.Labels) {
-				wID := SanitizeID(w.Name)
-				fmt.Fprintf(b, "%s  %s -> %s\n", indent, svcID, wID)
-			}
+	for _, w := range workloads {
+		if LabelsMatch(svc.Selector, w.Labels) {
+			fmt.Fprintf(b, "%s  %s -> %s\n", indent, svcID, WorkloadID(w))
 		}
 	}
 }
@@ -517,6 +504,11 @@ func SanitizeID(s string) string {
 // EntrypointID returns the rendered D2 identifier for an Entrypoint node.
 func EntrypointID(kind, name string) string {
 	return "ep_" + SanitizeID(strings.ToLower(kind)+":"+name)
+}
+
+// WorkloadID returns the rendered D2 identifier for a workload node.
+func WorkloadID(w model.Workload) string {
+	return SanitizeID(strings.ToLower(w.Kind) + ":" + w.Name)
 }
 
 // ServiceID returns the rendered D2 identifier for a Service node.
