@@ -54,7 +54,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&rootOptions.image, "image", "i", "", "output .svg image file. Extension is not needed always SVG file is generated")
 	rootCmd.PersistentFlags().StringVar(&rootOptions.krokiBaseURL, "kroki-base-url", kroki.DefaultBaseURL, "Kroki base URL for SVG generation")
 	rootCmd.PersistentFlags().DurationVar(&rootOptions.krokiTimeout, "kroki-timeout", kroki.DefaultTimeout, "Kroki request timeout for SVG generation")
-	rootCmd.PersistentFlags().BoolVar(&rootOptions.includeStorage, "include-storage", false, "include PVC/StorageClass layer")
+	rootCmd.PersistentFlags().BoolVar(&rootOptions.includeStorage, "include-storage", false, "include PVC layer with storage class labels")
 	rootCmd.PersistentFlags().IntVar(&rootOptions.gridColumns, "grid-columns", 3, "deprecated: automatic layout is used")
 	if err := rootCmd.PersistentFlags().MarkDeprecated("grid-columns", "automatic layout is now used; this flag has no effect"); err != nil {
 		panic(err)
