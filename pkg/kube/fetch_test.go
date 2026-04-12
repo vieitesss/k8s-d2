@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/vieitesss/k8s-d2/pkg/model"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -265,5 +267,61 @@ func TestServiceTargetPort(t *testing.T) {
 				t.Fatalf("ServiceTargetPort(%+v) = %q, want %q", tt.port, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestFetchPVCsCapacityFallback(t *testing.T) {
+	client := &Client{clientset: fake.NewSimpleClientset(
+		&corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: "bound", Namespace: "apps"},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+			},
+			Status: corev1.PersistentVolumeClaimStatus{
+				Capacity: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse("12Gi"),
+				},
+			},
+		},
+		&corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: "pending", Namespace: "apps"},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("5Gi"),
+					},
+				},
+			},
+		},
+		&corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: "empty", Namespace: "apps"},
+		},
+	)}
+
+	ns := &model.Namespace{Name: "apps"}
+	if err := client.fetchPVCs(context.Background(), "apps", ns); err != nil {
+		t.Fatalf("fetchPVCs returned error: %v", err)
+	}
+
+	got := ns.PVCs
+	want := []model.PVC{
+		{Name: "bound", Capacity: "12Gi"},
+		{Name: "pending", Capacity: "5Gi"},
+		{Name: "empty", Capacity: ""},
+	}
+
+	slices.SortFunc(got, func(a, b model.PVC) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	slices.SortFunc(want, func(a, b model.PVC) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("fetchPVCs PVCs = %#v, want %#v", got, want)
 	}
 }

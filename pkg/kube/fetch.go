@@ -303,6 +303,8 @@ func (c *Client) fetchPVCs(ctx context.Context, nsName string, ns *model.Namespa
 		capacity := ""
 		if storage, ok := pvc.Status.Capacity["storage"]; ok {
 			capacity = storage.String()
+		} else if storage, ok := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; ok {
+			capacity = storage.String()
 		}
 		ns.PVCs = append(ns.PVCs, model.PVC{
 			Name:         pvc.Name,
