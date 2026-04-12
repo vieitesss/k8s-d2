@@ -602,6 +602,52 @@ func TestParseTestFixtures_IncludesStatefulSetGeneratedPVCsWithStorage(t *testin
 	}
 }
 
+func TestParseTestFixtures_WithStorage_RendersPVCsWithoutStorageClassNodes(t *testing.T) {
+	data, err := loadAllFixtures()
+	if err != nil {
+		t.Fatalf("Failed to load all fixtures: %v", err)
+	}
+
+	cluster, err := parseTestFixtures(data, true)
+	if err != nil {
+		t.Fatalf("Failed to parse all fixtures: %v", err)
+	}
+
+	if len(cluster.Namespaces) != 1 {
+		t.Fatalf("expected one namespace, got %d", len(cluster.Namespaces))
+	}
+
+	expectedStorageClassLabels := 0
+	for _, pvc := range cluster.Namespaces[0].PVCs {
+		if pvc.StorageClass == "standard" {
+			expectedStorageClassLabels++
+		}
+	}
+	if expectedStorageClassLabels == 0 {
+		t.Fatalf("expected parsed storage fixtures to preserve PVC storage class metadata")
+	}
+
+	var buf bytes.Buffer
+	renderer := render.NewD2Renderer(&buf, 0)
+	if err := renderer.Render(cluster); err != nil {
+		t.Fatalf("Failed to render D2: %v", err)
+	}
+
+	output := buf.String()
+	if got := strings.Count(output, "[standard]"); got != expectedStorageClassLabels {
+		t.Fatalf("expected %d PVC storage class labels in output, got %d\n%s", expectedStorageClassLabels, got, output)
+	}
+	if strings.Contains(output, render.SanitizeID("standard")) {
+		t.Fatalf("did not expect storage class %q to render as a standalone node\n%s", "standard", output)
+	}
+	if strings.Contains(output, "label: \"standard\"") {
+		t.Fatalf("did not expect storage class %q to render as a standalone label\n%s", "standard", output)
+	}
+	if strings.Contains(output, "StorageClass") {
+		t.Fatalf("did not expect StorageClass resources to render as nodes\n%s", output)
+	}
+}
+
 // Test constants
 const (
 	testNamespace = "k8s-d2-test"

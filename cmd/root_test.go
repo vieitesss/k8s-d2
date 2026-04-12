@@ -3,13 +3,16 @@ package cmd
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/spf13/pflag"
+	"github.com/vieitesss/k8s-d2/internal/validation"
 	"github.com/vieitesss/k8s-d2/pkg/kroki"
+	"github.com/vieitesss/k8s-d2/pkg/render"
 )
 
 func TestRootAndDiagramExposeSameGenerationFlags(t *testing.T) {
@@ -49,6 +52,64 @@ func TestRootAndDiagramExposeSameGenerationFlags(t *testing.T) {
 				t.Fatalf("expected diagram command %q shorthand %q, got %q", tt.name, tt.shorthand, diagramFlag.Shorthand)
 			}
 		})
+	}
+}
+
+func TestIncludeStorageFlagDescriptionMatchesCurrentBehavior(t *testing.T) {
+	for _, cmd := range []struct {
+		name string
+		flag *pflag.Flag
+	}{
+		{name: "root", flag: rootCmd.Flag("include-storage")},
+		{name: "diagram", flag: diagramCmd.Flag("include-storage")},
+	} {
+		t.Run(cmd.name, func(t *testing.T) {
+			if cmd.flag == nil {
+				t.Fatalf("expected include-storage flag to be registered")
+			}
+			if cmd.flag.Usage != includeStorageUsage {
+				t.Fatalf("expected include-storage usage %q, got %q", includeStorageUsage, cmd.flag.Usage)
+			}
+		})
+	}
+}
+
+func TestIncludeStorageFlagKeepsPVCOnlyRenderContract(t *testing.T) {
+	fixtureData := loadFixtureFiles(t,
+		filepath.Join("..", "test", "fixtures", "base", "04-statefulsets.yaml"),
+		filepath.Join("..", "test", "fixtures", "storage", "01-storageclass.yaml"),
+		filepath.Join("..", "test", "fixtures", "storage", "02-pvcs.yaml"),
+	)
+
+	cluster, err := validation.NewFixtureParser("k8s-d2-test", true).ParseFixtures(fixtureData)
+	if err != nil {
+		t.Fatalf("failed to parse storage fixtures: %v", err)
+	}
+
+	var buf bytes.Buffer
+	renderer := render.NewD2Renderer(&buf, 0)
+	if err := renderer.Render(cluster); err != nil {
+		t.Fatalf("failed to render storage fixtures: %v", err)
+	}
+
+	output := buf.String()
+	for _, pvcName := range []string{"logs-volume", "data-database-0", "data-database-1"} {
+		if !strings.Contains(output, render.PVCID(pvcName)+": {") {
+			t.Fatalf("expected PVC %q to render in storage output\n%s", pvcName, output)
+		}
+	}
+
+	if got := strings.Count(output, "[standard]"); got != 3 {
+		t.Fatalf("expected 3 PVC storage class labels in storage output, got %d\n%s", got, output)
+	}
+	if strings.Contains(output, render.SanitizeID("standard")+": {") {
+		t.Fatalf("did not expect storage class %q to render as a standalone node\n%s", "standard", output)
+	}
+	if strings.Contains(output, "label: \"standard\"") {
+		t.Fatalf("did not expect storage class %q to render as a standalone label\n%s", "standard", output)
+	}
+	if strings.Contains(output, "StorageClass") {
+		t.Fatalf("did not expect StorageClass resources to render as nodes\n%s", output)
 	}
 }
 
@@ -181,6 +242,21 @@ func TestNamespaceFlagSupportsMultipleValues(t *testing.T) {
 			}
 		})
 	}
+}
+
+func loadFixtureFiles(t *testing.T, paths ...string) [][]byte {
+	t.Helper()
+
+	fixtureData := make([][]byte, 0, len(paths))
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("failed to read fixture %q: %v", path, err)
+		}
+		fixtureData = append(fixtureData, data)
+	}
+
+	return fixtureData
 }
 
 func TestRunRootQuietSuppressesDeprecatedWarning(t *testing.T) {
