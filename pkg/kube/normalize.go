@@ -35,10 +35,9 @@ func NormalizeStatefulSet(ss appsv1.StatefulSet) model.Workload {
 // NormalizeDaemonSet converts a Kubernetes DaemonSet into the shared workload model.
 func NormalizeDaemonSet(ds appsv1.DaemonSet) model.Workload {
 	return model.Workload{
-		Name: ds.Name,
-		Kind: "DaemonSet",
-		// DaemonSet scheduling is runtime status data that fixture manifests usually omit.
-		Replicas:     0,
+		Name:         ds.Name,
+		Kind:         "DaemonSet",
+		Replicas:     ds.Status.DesiredNumberScheduled,
 		Labels:       ds.Spec.Selector.MatchLabels,
 		VolumeMounts: ExtractVolumeMounts(ds.Spec.Template.Spec.Containers, ds.Spec.Template.Spec.Volumes),
 	}

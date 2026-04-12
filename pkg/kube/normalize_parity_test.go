@@ -1,14 +1,14 @@
 package kube_test
 
 import (
+	"bytes"
 	"context"
-	"reflect"
-	"sort"
 	"testing"
 
 	"github.com/vieitesss/k8s-d2/internal/validation"
 	"github.com/vieitesss/k8s-d2/pkg/kube"
 	"github.com/vieitesss/k8s-d2/pkg/model"
+	"github.com/vieitesss/k8s-d2/pkg/render"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -20,7 +20,22 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func TestFetchTopologyAndFixtureParserProduceEquivalentTopology(t *testing.T) {
+func TestNormalizeDaemonSetUsesDesiredNumberScheduled(t *testing.T) {
+	daemonSet := appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "node-agent"},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "node-agent"}},
+		},
+		Status: appsv1.DaemonSetStatus{DesiredNumberScheduled: 3},
+	}
+
+	got := kube.NormalizeDaemonSet(daemonSet)
+	if got.Replicas != 3 {
+		t.Fatalf("daemonset replicas = %d, want 3", got.Replicas)
+	}
+}
+
+func TestFetchTopologyAndFixtureParserProduceEquivalentRenderedTopology(t *testing.T) {
 	const namespace = "apps"
 
 	deployment := appsv1.Deployment{
@@ -105,6 +120,8 @@ func TestFetchTopologyAndFixtureParserProduceEquivalentTopology(t *testing.T) {
 		},
 		Status: appsv1.DaemonSetStatus{DesiredNumberScheduled: 3},
 	}
+	fixtureDaemonSet := daemonSet
+	fixtureDaemonSet.Status = appsv1.DaemonSetStatus{}
 
 	service := corev1.Service{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Service"},
@@ -242,7 +259,7 @@ func TestFetchTopologyAndFixtureParserProduceEquivalentTopology(t *testing.T) {
 		&corev1.Namespace{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Namespace"}, ObjectMeta: metav1.ObjectMeta{Name: namespace}},
 		&deployment,
 		&statefulSet,
-		&daemonSet,
+		&fixtureDaemonSet,
 		&service,
 		&ingress,
 		&userConfigMap,
@@ -257,33 +274,41 @@ func TestFetchTopologyAndFixtureParserProduceEquivalentTopology(t *testing.T) {
 		t.Fatalf("ParseFixtures returned error: %v", err)
 	}
 
-	sortClusterForComparison(liveCluster)
-	sortClusterForComparison(fixtureCluster)
-
-	if !reflect.DeepEqual(liveCluster, fixtureCluster) {
-		t.Fatalf("live and fixture topology diverged\nlive: %#v\nfixture: %#v", liveCluster, fixtureCluster)
+	if liveOutput, fixtureOutput := renderCluster(t, liveCluster), renderCluster(t, fixtureCluster); liveOutput != fixtureOutput {
+		t.Fatalf("live and fixture rendered topology diverged\nlive:\n%s\nfixture:\n%s", liveOutput, fixtureOutput)
 	}
 
-	ns := liveCluster.Namespaces[0]
-	if got := ns.Deployments[0].Replicas; got != 1 {
-		t.Fatalf("deployment replicas = %d, want 1", got)
+	if got := liveCluster.Namespaces[0].DaemonSets[0].Replicas; got != 3 {
+		t.Fatalf("live daemonset replicas = %d, want 3", got)
 	}
-	if got := ns.DaemonSets[0].Replicas; got != 0 {
-		t.Fatalf("daemonset replicas = %d, want 0", got)
+	if got := fixtureCluster.Namespaces[0].DaemonSets[0].Replicas; got != 0 {
+		t.Fatalf("fixture daemonset replicas = %d, want 0", got)
 	}
-	if got := findPVC(t, ns.PVCs, "logs-volume").Capacity; got != "1Gi" {
-		t.Fatalf("logs-volume capacity = %q, want %q", got, "1Gi")
-	}
-	if ns.ConfigMaps != 1 {
-		t.Fatalf("configmap count = %d, want 1", ns.ConfigMaps)
-	}
-	if ns.Secrets != 1 {
-		t.Fatalf("secret count = %d, want 1", ns.Secrets)
-	}
-	for _, name := range []string{"data-database-0", "data-database-1"} {
-		pvc := findPVC(t, ns.PVCs, name)
-		if pvc.Capacity != "2Gi" {
-			t.Fatalf("generated pvc %s capacity = %q, want %q", name, pvc.Capacity, "2Gi")
+
+	for _, tc := range []struct {
+		name string
+		ns   model.Namespace
+	}{
+		{name: "live", ns: liveCluster.Namespaces[0]},
+		{name: "fixture", ns: fixtureCluster.Namespaces[0]},
+	} {
+		if got := tc.ns.Deployments[0].Replicas; got != 1 {
+			t.Fatalf("%s deployment replicas = %d, want 1", tc.name, got)
+		}
+		if got := findPVC(t, tc.ns.PVCs, "logs-volume").Capacity; got != "1Gi" {
+			t.Fatalf("%s logs-volume capacity = %q, want %q", tc.name, got, "1Gi")
+		}
+		if tc.ns.ConfigMaps != 1 {
+			t.Fatalf("%s configmap count = %d, want 1", tc.name, tc.ns.ConfigMaps)
+		}
+		if tc.ns.Secrets != 1 {
+			t.Fatalf("%s secret count = %d, want 1", tc.name, tc.ns.Secrets)
+		}
+		for _, name := range []string{"data-database-0", "data-database-1"} {
+			pvc := findPVC(t, tc.ns.PVCs, name)
+			if pvc.Capacity != "2Gi" {
+				t.Fatalf("%s generated pvc %s capacity = %q, want %q", tc.name, name, pvc.Capacity, "2Gi")
+			}
 		}
 	}
 }
@@ -303,25 +328,16 @@ func marshalFixtures(t *testing.T, objects ...runtime.Object) [][]byte {
 	return fixtures
 }
 
-func sortClusterForComparison(cluster *model.Cluster) {
-	sort.Slice(cluster.Namespaces, func(i, j int) bool {
-		return cluster.Namespaces[i].Name < cluster.Namespaces[j].Name
-	})
+func renderCluster(t *testing.T, cluster *model.Cluster) string {
+	t.Helper()
 
-	for i := range cluster.Namespaces {
-		ns := &cluster.Namespaces[i]
-		sort.Slice(ns.Deployments, func(i, j int) bool { return ns.Deployments[i].Name < ns.Deployments[j].Name })
-		sort.Slice(ns.StatefulSets, func(i, j int) bool { return ns.StatefulSets[i].Name < ns.StatefulSets[j].Name })
-		sort.Slice(ns.DaemonSets, func(i, j int) bool { return ns.DaemonSets[i].Name < ns.DaemonSets[j].Name })
-		sort.Slice(ns.Entrypoints, func(i, j int) bool {
-			if ns.Entrypoints[i].Kind != ns.Entrypoints[j].Kind {
-				return ns.Entrypoints[i].Kind < ns.Entrypoints[j].Kind
-			}
-			return ns.Entrypoints[i].Name < ns.Entrypoints[j].Name
-		})
-		sort.Slice(ns.Services, func(i, j int) bool { return ns.Services[i].Name < ns.Services[j].Name })
-		sort.Slice(ns.PVCs, func(i, j int) bool { return ns.PVCs[i].Name < ns.PVCs[j].Name })
+	var buf bytes.Buffer
+	renderer := render.NewD2Renderer(&buf, 0)
+	if err := renderer.Render(cluster); err != nil {
+		t.Fatalf("render cluster: %v", err)
 	}
+
+	return buf.String()
 }
 
 func findPVC(t *testing.T, pvcs []model.PVC, name string) model.PVC {
