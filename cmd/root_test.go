@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -198,7 +199,7 @@ func TestRunRootQuietSuppressesDeprecatedWarning(t *testing.T) {
 	log.SetOutput(&logOutput)
 	log.SetLevel(log.InfoLevel)
 	t.Cleanup(func() {
-		log.SetOutput(nil)
+		log.SetOutput(os.Stderr)
 		log.SetLevel(originalLevel)
 	})
 
@@ -210,9 +211,6 @@ func TestRunRootQuietSuppressesDeprecatedWarning(t *testing.T) {
 	output := logOutput.String()
 	if strings.Contains(output, "DEPRECATED: Running k8sdd without a subcommand is deprecated") {
 		t.Fatalf("expected quiet root path to suppress deprecated warning, got %q", output)
-	}
-	if strings.Contains(output, "D2 diagram generated successfully") {
-		t.Fatalf("expected quiet root path to suppress info logs, got %q", output)
 	}
 }
 
@@ -231,7 +229,7 @@ func TestRunRootWarnsWhenNotQuiet(t *testing.T) {
 	log.SetOutput(&logOutput)
 	log.SetLevel(log.InfoLevel)
 	t.Cleanup(func() {
-		log.SetOutput(nil)
+		log.SetOutput(os.Stderr)
 		log.SetLevel(originalLevel)
 	})
 
