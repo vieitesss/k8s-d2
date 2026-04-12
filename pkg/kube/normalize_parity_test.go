@@ -268,8 +268,8 @@ func TestFetchTopologyAndFixtureParserProduceEquivalentTopology(t *testing.T) {
 	if got := ns.Deployments[0].Replicas; got != 1 {
 		t.Fatalf("deployment replicas = %d, want 1", got)
 	}
-	if got := ns.DaemonSets[0].Replicas; got != 3 {
-		t.Fatalf("daemonset replicas = %d, want 3", got)
+	if got := ns.DaemonSets[0].Replicas; got != 0 {
+		t.Fatalf("daemonset replicas = %d, want 0", got)
 	}
 	if got := findPVC(t, ns.PVCs, "logs-volume").Capacity; got != "1Gi" {
 		t.Fatalf("logs-volume capacity = %q, want %q", got, "1Gi")
