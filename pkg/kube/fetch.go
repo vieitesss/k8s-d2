@@ -145,17 +145,7 @@ func (c *Client) fetchDeployments(ctx context.Context, nsName string, ns *model.
 		return err
 	}
 	for _, d := range deps.Items {
-		volumeMounts := ExtractVolumeMounts(
-			d.Spec.Template.Spec.Containers,
-			d.Spec.Template.Spec.Volumes,
-		)
-		ns.Deployments = append(ns.Deployments, model.Workload{
-			Name:         d.Name,
-			Kind:         "Deployment",
-			Replicas:     *d.Spec.Replicas,
-			Labels:       d.Spec.Selector.MatchLabels,
-			VolumeMounts: volumeMounts,
-		})
+		ns.Deployments = append(ns.Deployments, NormalizeDeployment(d))
 	}
 	return nil
 }
@@ -166,26 +156,7 @@ func (c *Client) fetchStatefulSets(ctx context.Context, nsName string, ns *model
 		return err
 	}
 	for _, ss := range ssets.Items {
-		// Default to 1 replica if not specified (Kubernetes StatefulSet default)
-		replicas := int32(1)
-		if ss.Spec.Replicas != nil {
-			replicas = *ss.Spec.Replicas
-		}
-
-		volumeMounts := ExtractAllStatefulSetVolumeMounts(
-			ss.Spec.Template.Spec.Containers,
-			ss.Spec.Template.Spec.Volumes,
-			ss.Spec.VolumeClaimTemplates,
-			ss.Name,
-			replicas,
-		)
-		ns.StatefulSets = append(ns.StatefulSets, model.Workload{
-			Name:         ss.Name,
-			Kind:         "StatefulSet",
-			Replicas:     replicas,
-			Labels:       ss.Spec.Selector.MatchLabels,
-			VolumeMounts: volumeMounts,
-		})
+		ns.StatefulSets = append(ns.StatefulSets, NormalizeStatefulSet(ss))
 	}
 	return nil
 }
@@ -196,17 +167,7 @@ func (c *Client) fetchDaemonSets(ctx context.Context, nsName string, ns *model.N
 		return err
 	}
 	for _, ds := range dsets.Items {
-		volumeMounts := ExtractVolumeMounts(
-			ds.Spec.Template.Spec.Containers,
-			ds.Spec.Template.Spec.Volumes,
-		)
-		ns.DaemonSets = append(ns.DaemonSets, model.Workload{
-			Name:         ds.Name,
-			Kind:         "DaemonSet",
-			Replicas:     ds.Status.DesiredNumberScheduled,
-			Labels:       ds.Spec.Selector.MatchLabels,
-			VolumeMounts: volumeMounts,
-		})
+		ns.DaemonSets = append(ns.DaemonSets, NormalizeDaemonSet(ds))
 	}
 	return nil
 }
@@ -217,22 +178,7 @@ func (c *Client) fetchServices(ctx context.Context, nsName string, ns *model.Nam
 		return err
 	}
 	for _, svc := range svcs.Items {
-		ports := []model.Port{}
-		for _, p := range svc.Spec.Ports {
-			ports = append(ports, model.Port{
-				Name:       p.Name,
-				Port:       p.Port,
-				TargetPort: ServiceTargetPort(p),
-				NodePort:   p.NodePort,
-			})
-		}
-
-		service := model.Service{
-			Name:     svc.Name,
-			Type:     string(svc.Spec.Type),
-			Selector: svc.Spec.Selector,
-			Ports:    ports,
-		}
+		service := NormalizeService(svc)
 
 		ns.Services = append(ns.Services, service)
 		if entrypoint, ok := EntrypointForService(service); ok {
@@ -264,28 +210,14 @@ func (c *Client) fetchConfigMapsAndSecrets(ctx context.Context, nsName string, n
 		return err
 	}
 
-	// Filter out system-managed ConfigMaps
-	userConfigMaps := 0
-	for _, cm := range cms.Items {
-		if !isSystemConfigMap(cm.Name) {
-			userConfigMaps++
-		}
-	}
-	ns.ConfigMaps = userConfigMaps
+	ns.ConfigMaps = CountUserConfigMaps(cms.Items)
 
 	secrets, err := c.clientset.CoreV1().Secrets(nsName).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
-	// Filter out system-managed Secrets (service account tokens)
-	userSecrets := 0
-	for _, secret := range secrets.Items {
-		if !isSystemSecret(secret.Name, secret.Type) {
-			userSecrets++
-		}
-	}
-	ns.Secrets = userSecrets
+	ns.Secrets = CountUserSecrets(secrets.Items)
 
 	return nil
 }
@@ -296,20 +228,7 @@ func (c *Client) fetchPVCs(ctx context.Context, nsName string, ns *model.Namespa
 		return err
 	}
 	for _, pvc := range pvcs.Items {
-		storageClass := ""
-		if pvc.Spec.StorageClassName != nil {
-			storageClass = *pvc.Spec.StorageClassName
-		}
-		capacity := ""
-		if storage, ok := pvc.Status.Capacity["storage"]; ok {
-			capacity = storage.String()
-		}
-		ns.PVCs = append(ns.PVCs, model.PVC{
-			Name:         pvc.Name,
-			StorageClass: storageClass,
-			Capacity:     capacity,
-			BoundPod:     "", // TODO: determine which pod uses this PVC
-		})
+		ns.PVCs = append(ns.PVCs, NormalizePVC(pvc))
 	}
 	return nil
 }
