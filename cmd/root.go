@@ -37,7 +37,9 @@ visualizing namespaces, workloads, services, and their relationships.`,
 }
 
 func runRoot(cmd *cobra.Command, args []string) error {
-	log.Warn("DEPRECATED: Running k8sdd without a subcommand is deprecated. Please use 'k8sdd diagram' instead. This will be removed in v1.0.0.")
+	if !rootOptions.quiet {
+		log.Warn("DEPRECATED: Running k8sdd without a subcommand is deprecated. Please use 'k8sdd diagram' instead. This will be removed in v1.0.0.")
+	}
 	return runGenerate(cmd, args)
 }
 
