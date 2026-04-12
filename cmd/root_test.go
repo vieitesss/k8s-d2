@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/log"
 	"github.com/spf13/pflag"
 	"github.com/vieitesss/k8s-d2/pkg/kroki"
 )
@@ -176,5 +179,69 @@ func TestNamespaceFlagSupportsMultipleValues(t *testing.T) {
 				t.Fatalf("expected namespace flag type stringSlice, got %q", got)
 			}
 		})
+	}
+}
+
+func TestRunRootQuietSuppressesDeprecatedWarning(t *testing.T) {
+	originalOptions := rootOptions
+	rootOptions = RootOptions{
+		kubeconfig: "/definitely/missing-kubeconfig",
+		quiet:      true,
+	}
+	t.Cleanup(func() {
+		rootOptions = originalOptions
+	})
+
+	var logOutput bytes.Buffer
+	defaultLogger := log.Default()
+	originalLevel := defaultLogger.GetLevel()
+	log.SetOutput(&logOutput)
+	log.SetLevel(log.InfoLevel)
+	t.Cleanup(func() {
+		log.SetOutput(nil)
+		log.SetLevel(originalLevel)
+	})
+
+	err := runRoot(rootCmd, nil)
+	if err == nil {
+		t.Fatal("expected runRoot to fail with invalid kubeconfig")
+	}
+
+	output := logOutput.String()
+	if strings.Contains(output, "DEPRECATED: Running k8sdd without a subcommand is deprecated") {
+		t.Fatalf("expected quiet root path to suppress deprecated warning, got %q", output)
+	}
+	if strings.Contains(output, "D2 diagram generated successfully") {
+		t.Fatalf("expected quiet root path to suppress info logs, got %q", output)
+	}
+}
+
+func TestRunRootWarnsWhenNotQuiet(t *testing.T) {
+	originalOptions := rootOptions
+	rootOptions = RootOptions{
+		kubeconfig: "/definitely/missing-kubeconfig",
+	}
+	t.Cleanup(func() {
+		rootOptions = originalOptions
+	})
+
+	var logOutput bytes.Buffer
+	defaultLogger := log.Default()
+	originalLevel := defaultLogger.GetLevel()
+	log.SetOutput(&logOutput)
+	log.SetLevel(log.InfoLevel)
+	t.Cleanup(func() {
+		log.SetOutput(nil)
+		log.SetLevel(originalLevel)
+	})
+
+	err := runRoot(rootCmd, nil)
+	if err == nil {
+		t.Fatal("expected runRoot to fail with invalid kubeconfig")
+	}
+
+	output := logOutput.String()
+	if !strings.Contains(output, "DEPRECATED: Running k8sdd without a subcommand is deprecated") {
+		t.Fatalf("expected non-quiet root path to emit deprecated warning, got %q", output)
 	}
 }
