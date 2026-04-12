@@ -53,10 +53,11 @@ func (rd *RelationshipDeriver) EntrypointToServiceConnections(ns *model.Namespac
 // based on label selector matching
 func (rd *RelationshipDeriver) ServiceToWorkloadConnections(ns *model.Namespace) []Connection {
 	var connections []Connection
+	workloads := model.AllWorkloads(ns)
 
 	for _, svc := range ns.Services {
 		svcID := render.ServiceID(svc.Name)
-		for _, w := range model.AllWorkloads(ns) {
+		for _, w := range workloads {
 			if render.LabelsMatch(svc.Selector, w.Labels) {
 				connections = append(connections, Connection{
 					From: svcID,
