@@ -22,6 +22,8 @@ type RootOptions struct {
 	quiet          bool
 }
 
+const includeStorageUsage = "include PVC layer with storage class labels"
+
 var rootOptions RootOptions
 
 var rootCmd = &cobra.Command{
@@ -35,7 +37,9 @@ visualizing namespaces, workloads, services, and their relationships.`,
 }
 
 func runRoot(cmd *cobra.Command, args []string) error {
-	log.Warn("DEPRECATED: Running k8sdd without a subcommand is deprecated. Please use 'k8sdd diagram' instead. This will be removed in v1.0.0.")
+	if !rootOptions.quiet {
+		log.Warn("DEPRECATED: Running k8sdd without a subcommand is deprecated. Please use 'k8sdd diagram' instead. This will be removed in v1.0.0.")
+	}
 	return runGenerate(cmd, args)
 }
 
@@ -54,7 +58,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&rootOptions.image, "image", "i", "", "output .svg image file. Extension is not needed always SVG file is generated")
 	rootCmd.PersistentFlags().StringVar(&rootOptions.krokiBaseURL, "kroki-base-url", kroki.DefaultBaseURL, "Kroki base URL for SVG generation")
 	rootCmd.PersistentFlags().DurationVar(&rootOptions.krokiTimeout, "kroki-timeout", kroki.DefaultTimeout, "Kroki request timeout for SVG generation")
-	rootCmd.PersistentFlags().BoolVar(&rootOptions.includeStorage, "include-storage", false, "include PVC/StorageClass layer")
+	rootCmd.PersistentFlags().BoolVar(&rootOptions.includeStorage, "include-storage", false, includeStorageUsage)
 	rootCmd.PersistentFlags().IntVar(&rootOptions.gridColumns, "grid-columns", 3, "deprecated: automatic layout is used")
 	if err := rootCmd.PersistentFlags().MarkDeprecated("grid-columns", "automatic layout is now used; this flag has no effect"); err != nil {
 		panic(err)

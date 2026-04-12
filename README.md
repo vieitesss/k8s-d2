@@ -97,12 +97,14 @@ k8sdd diagram -i cluster.svg --kroki-base-url https://kroki.internal --kroki-tim
 | `--image` | `-i` | | Output SVG image file (uses Kroki API) |
 | `--kroki-base-url` | | `https://kroki.io` | Kroki base URL for SVG generation |
 | `--kroki-timeout` | | `30s` | Kroki request timeout for SVG generation |
-| `--include-storage` | | `false` | Include PVCs and StorageClasses |
+| `--include-storage` | | `false` | Include PVCs with storage class labels |
 | `--quiet` | `-q` | `false` | Suppress progress indicators and log messages |
 
 > **Note:** `--output` and `--image` are mutually exclusive.
 >
 > `--kroki-base-url` and `--kroki-timeout` are only used with `--image`. When set, the Kroki base URL must not be empty and the timeout must be greater than `0`.
+
+`--include-storage` adds PVC nodes to the diagram and shows each PVC's storage class as label metadata when available. It does not render `StorageClass` objects as separate nodes.
 
 ## Requirements
 

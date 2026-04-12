@@ -44,8 +44,8 @@ func TestRelationshipDeriver_UsesKindAwareWorkloadIDsForSameNameWorkloads(t *tes
 	}
 
 	wantServiceTargets := map[string]struct{}{
-		render.WorkloadID("Deployment", "api"):  {},
-		render.WorkloadID("StatefulSet", "api"): {},
+		render.WorkloadID(model.Workload{Name: "api", Kind: "Deployment"}):  {},
+		render.WorkloadID(model.Workload{Name: "api", Kind: "StatefulSet"}): {},
 	}
 	for _, conn := range serviceConnections {
 		if conn.From != render.ServiceID("api-service") {
@@ -69,11 +69,11 @@ func TestRelationshipDeriver_UsesKindAwareWorkloadIDsForSameNameWorkloads(t *tes
 		to    string
 		label string
 	}{
-		render.WorkloadID("Deployment", "api"): {
+		render.WorkloadID(model.Workload{Name: "api", Kind: "Deployment"}): {
 			to:    render.PVCID("deploy-data"),
 			label: "/srv/api (rw)",
 		},
-		render.WorkloadID("StatefulSet", "api"): {
+		render.WorkloadID(model.Workload{Name: "api", Kind: "StatefulSet"}): {
 			to:    render.PVCID("state-data"),
 			label: "/var/lib/api (rw)",
 		},

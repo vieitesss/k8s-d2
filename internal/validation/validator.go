@@ -114,13 +114,8 @@ func (v *D2Validator) ValidateResources() error {
 			return fmt.Errorf("incorrect namespace label for %s", ns.Name)
 		}
 
-		allWorkloads := []model.Workload{}
-		allWorkloads = append(allWorkloads, ns.Deployments...)
-		allWorkloads = append(allWorkloads, ns.StatefulSets...)
-		allWorkloads = append(allWorkloads, ns.DaemonSets...)
-
-		for _, w := range allWorkloads {
-			wID := render.WorkloadID(w.Kind, w.Name)
+		for _, w := range model.AllWorkloads(&ns) {
+			wID := render.WorkloadID(w)
 			if !containsD2Line(namespaceBlock, fmt.Sprintf("%s: {", wID)) {
 				return fmt.Errorf("missing workload: %s (%s)", w.Name, w.Kind)
 			}
@@ -165,19 +160,7 @@ func (v *D2Validator) ValidateWorkloadLabels() error {
 			return err
 		}
 
-		// Check deployments and statefulsets (they have replica counts)
-		workloadsWithReplicas := []model.Workload{}
-		workloadsWithReplicas = append(workloadsWithReplicas, ns.Deployments...)
-		workloadsWithReplicas = append(workloadsWithReplicas, ns.StatefulSets...)
-
-		for _, w := range workloadsWithReplicas {
-			expectedLabel := render.WorkloadLabel(w)
-			if !containsD2Line(namespaceBlock, fmt.Sprintf("label: %s", render.QuoteString(expectedLabel))) {
-				return fmt.Errorf("incorrect label for %s (expected: %s)", w.Name, expectedLabel)
-			}
-		}
-
-		for _, w := range ns.DaemonSets {
+		for _, w := range model.AllWorkloads(&ns) {
 			expectedLabel := render.WorkloadLabel(w)
 			if !containsD2Line(namespaceBlock, fmt.Sprintf("label: %s", render.QuoteString(expectedLabel))) {
 				return fmt.Errorf("incorrect label for %s (expected: %s)", w.Name, expectedLabel)

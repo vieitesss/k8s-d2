@@ -49,7 +49,7 @@ dagger call fixture-image \
   export --path ./cluster.svg
 ```
 
-Export the SVG with storage resources included:
+Export the SVG with PVCs and storage class labels included:
 
 ```bash
 dagger call fixture-image \
