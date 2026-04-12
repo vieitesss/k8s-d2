@@ -49,8 +49,6 @@ func TestRootAndDiagramExposeSameGenerationFlags(t *testing.T) {
 }
 
 func TestIncludeStorageFlagDescriptionMatchesCurrentBehavior(t *testing.T) {
-	const want = "include PVC layer with storage class labels"
-
 	for _, cmd := range []struct {
 		name string
 		flag *pflag.Flag
@@ -62,8 +60,8 @@ func TestIncludeStorageFlagDescriptionMatchesCurrentBehavior(t *testing.T) {
 			if cmd.flag == nil {
 				t.Fatalf("expected include-storage flag to be registered")
 			}
-			if cmd.flag.Usage != want {
-				t.Fatalf("expected include-storage usage %q, got %q", want, cmd.flag.Usage)
+			if cmd.flag.Usage != includeStorageUsage {
+				t.Fatalf("expected include-storage usage %q, got %q", includeStorageUsage, cmd.flag.Usage)
 			}
 		})
 	}
