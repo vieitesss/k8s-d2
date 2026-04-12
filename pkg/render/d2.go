@@ -250,7 +250,6 @@ func (r *D2Renderer) writeWorkloadPVCConnections(b *strings.Builder, workloads [
 		for _, mount := range w.VolumeMounts {
 			mountsByPVC[mount.PVCName] = append(mountsByPVC[mount.PVCName], mount)
 		}
-
 		pvcNames := make([]string, 0, len(mountsByPVC))
 		for pvcName := range mountsByPVC {
 			pvcNames = append(pvcNames, pvcName)

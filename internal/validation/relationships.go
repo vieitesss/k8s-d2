@@ -8,7 +8,7 @@ import (
 // Connection represents a relationship between two resources in the D2 diagram
 type Connection struct {
 	From  string // Source resource ID (e.g., "svc_id_7765622d73657276696365")
-	To    string // Target resource ID (e.g., "id_7765622d66726f6e74656e64")
+	To    string // Target resource ID (e.g., a rendered workload or PVC ID)
 	Type  string // Connection type: "entrypoint-to-service", "service-to-workload", or "workload-to-pvc"
 	Label string // Connection label for mount metadata (e.g., "/var/log (rw)")
 }
