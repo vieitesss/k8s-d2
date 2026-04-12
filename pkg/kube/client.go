@@ -47,6 +47,12 @@ func NewClient(kubeconfigPath string) (*Client, error) {
 	return &Client{clientset: clientset}, nil
 }
 
+// NewClientFromClientset constructs a Client from an existing clientset.
+// This is primarily useful for tests and callers that already manage cluster clients.
+func NewClientFromClientset(clientset kubernetes.Interface) *Client {
+	return &Client{clientset: clientset}
+}
+
 // ServiceTargetPort returns the rendered targetPort value, preserving named ports
 // and defaulting omitted targetPort values to the service port itself.
 func ServiceTargetPort(port corev1.ServicePort) string {

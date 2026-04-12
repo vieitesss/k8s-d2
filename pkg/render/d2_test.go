@@ -240,16 +240,16 @@ func TestRender_SortsNamespacesAndResourcesDeterministically(t *testing.T) {
 
 	alphaBlock := extractBlockFromMarker(t, output, fmt.Sprintf("  %s:", SanitizeID("alpha")))
 	assertAppearsInOrder(t, alphaBlock,
-		fmt.Sprintf("  %s: {", SanitizeID("a-api")),
-		fmt.Sprintf("  %s: {", SanitizeID("z-api")),
+		fmt.Sprintf("  %s: {", testWorkloadID("Deployment", "a-api")),
+		fmt.Sprintf("  %s: {", testWorkloadID("Deployment", "z-api")),
 	)
 	assertAppearsInOrder(t, alphaBlock,
-		fmt.Sprintf("  %s: {", SanitizeID("a-db")),
-		fmt.Sprintf("  %s: {", SanitizeID("z-db")),
+		fmt.Sprintf("  %s: {", testWorkloadID("StatefulSet", "a-db")),
+		fmt.Sprintf("  %s: {", testWorkloadID("StatefulSet", "z-db")),
 	)
 	assertAppearsInOrder(t, alphaBlock,
-		fmt.Sprintf("  %s: {", SanitizeID("a-agent")),
-		fmt.Sprintf("  %s: {", SanitizeID("z-agent")),
+		fmt.Sprintf("  %s: {", testWorkloadID("DaemonSet", "a-agent")),
+		fmt.Sprintf("  %s: {", testWorkloadID("DaemonSet", "z-agent")),
 	)
 	assertAppearsInOrder(t, alphaBlock,
 		fmt.Sprintf("  %s: {", EntrypointID("Ingress", "a-edge")),
@@ -314,6 +314,70 @@ func TestRender_RendersEntrypointLabelsAndConnections(t *testing.T) {
 	}
 }
 
+func TestRender_UsesKindAwareWorkloadIDsForSameNameWorkloads(t *testing.T) {
+	cluster := &model.Cluster{
+		Namespaces: []model.Namespace{{
+			Name: "apps",
+			Deployments: []model.Workload{{
+				Name:     "api",
+				Kind:     "Deployment",
+				Replicas: 2,
+				Labels:   map[string]string{"app": "api"},
+				VolumeMounts: []model.VolumeMount{{
+					PVCName:   "deploy-data",
+					MountPath: "/srv/api",
+				}},
+			}},
+			StatefulSets: []model.Workload{{
+				Name:     "api",
+				Kind:     "StatefulSet",
+				Replicas: 1,
+				Labels:   map[string]string{"app": "api"},
+				VolumeMounts: []model.VolumeMount{{
+					PVCName:   "state-data",
+					MountPath: "/var/lib/api",
+				}},
+			}},
+			Services: []model.Service{{
+				Name:     "api-service",
+				Type:     "ClusterIP",
+				Selector: map[string]string{"app": "api"},
+			}},
+			PVCs: []model.PVC{{
+				Name: "deploy-data",
+			}, {
+				Name: "state-data",
+			}},
+		}},
+	}
+
+	output := renderTestCluster(t, cluster)
+	deploymentID := testWorkloadID("Deployment", "api")
+	statefulSetID := testWorkloadID("StatefulSet", "api")
+
+	if deploymentID == statefulSetID {
+		t.Fatalf("expected kind-aware workload ids to differ, got %q", deploymentID)
+	}
+	if !strings.Contains(output, fmt.Sprintf("  %s: {", deploymentID)) {
+		t.Fatalf("expected deployment node id %q, output was:\n%s", deploymentID, output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("  %s: {", statefulSetID)) {
+		t.Fatalf("expected statefulset node id %q, output was:\n%s", statefulSetID, output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("%s -> %s", ServiceID("api-service"), deploymentID)) {
+		t.Fatalf("expected service edge to deployment node, output was:\n%s", output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("%s -> %s", ServiceID("api-service"), statefulSetID)) {
+		t.Fatalf("expected service edge to statefulset node, output was:\n%s", output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("%s -> %s: %s", deploymentID, PVCID("deploy-data"), strconv.Quote("/srv/api (rw)"))) {
+		t.Fatalf("expected deployment pvc edge, output was:\n%s", output)
+	}
+	if !strings.Contains(output, fmt.Sprintf("%s -> %s: %s", statefulSetID, PVCID("state-data"), strconv.Quote("/var/lib/api (rw)"))) {
+		t.Fatalf("expected statefulset pvc edge, output was:\n%s", output)
+	}
+}
+
 func TestRender_SortsWorkloadPVCConnectionsDeterministically(t *testing.T) {
 	cluster := &model.Cluster{
 		Namespaces: []model.Namespace{{
@@ -338,8 +402,8 @@ func TestRender_SortsWorkloadPVCConnectionsDeterministically(t *testing.T) {
 	appsBlock := extractBlockFromMarker(t, output, fmt.Sprintf("  %s:", SanitizeID("apps")))
 
 	assertAppearsInOrder(t, appsBlock,
-		fmt.Sprintf("  %s -> %s: %s", SanitizeID("web"), PVCID("a-data"), strconv.Quote("/data (ro)")),
-		fmt.Sprintf("  %s -> %s: %s", SanitizeID("web"), PVCID("z-cache"), strconv.Quote("/cache (rw)")),
+		fmt.Sprintf("  %s -> %s: %s", testWorkloadID("Deployment", "web"), PVCID("a-data"), strconv.Quote("/data (ro)")),
+		fmt.Sprintf("  %s -> %s: %s", testWorkloadID("Deployment", "web"), PVCID("z-cache"), strconv.Quote("/cache (rw)")),
 	)
 }
 
@@ -433,6 +497,9 @@ func TestRender_EscapesIdentifiersAndLabels(t *testing.T) {
 	if !strings.Contains(output, fmt.Sprintf("  %s: {", ServiceID("api.v2-service"))) {
 		t.Fatalf("expected escaped service identifier, output was:\n%s", output)
 	}
+	if !strings.Contains(output, fmt.Sprintf("  %s: {", testWorkloadID("Deployment", "api.v2"))) {
+		t.Fatalf("expected escaped workload identifier, output was:\n%s", output)
+	}
 	if !strings.Contains(output, fmt.Sprintf("  %s: {", EntrypointID("Ingress", "edge.v2"))) {
 		t.Fatalf("expected escaped entrypoint identifier, output was:\n%s", output)
 	}
@@ -454,7 +521,7 @@ func TestRender_EscapesIdentifiersAndLabels(t *testing.T) {
 	if !strings.Contains(output, fmt.Sprintf("%s -> %s", EntrypointID("Ingress", "edge.v2"), ServiceID("api.v2-service"))) {
 		t.Fatalf("expected escaped entrypoint-to-service edge, output was:\n%s", output)
 	}
-	if !strings.Contains(output, fmt.Sprintf("%s -> %s", ServiceID("api.v2-service"), SanitizeID("api.v2"))) {
+	if !strings.Contains(output, fmt.Sprintf("%s -> %s", ServiceID("api.v2-service"), testWorkloadID("Deployment", "api.v2"))) {
 		t.Fatalf("expected escaped service-to-workload edge, output was:\n%s", output)
 	}
 }
@@ -511,6 +578,23 @@ func TestSanitizeID_AvoidsLossyCollisions(t *testing.T) {
 
 	if first == second {
 		t.Fatalf("expected distinct ids for different Kubernetes names, got %q", first)
+	}
+}
+
+func TestWorkloadID_UsesSanitizedKindAndName(t *testing.T) {
+	workload := model.Workload{Name: "api.v2", Kind: "Deployment"}
+
+	if got, want := WorkloadID(workload), SanitizeID("deployment:api.v2"); got != want {
+		t.Fatalf("WorkloadID(%+v) = %q, want %q", workload, got, want)
+	}
+}
+
+func TestWorkloadID_AvoidsCrossKindCollisions(t *testing.T) {
+	deployment := model.Workload{Name: "api", Kind: "Deployment"}
+	statefulSet := model.Workload{Name: "api", Kind: "StatefulSet"}
+
+	if WorkloadID(deployment) == WorkloadID(statefulSet) {
+		t.Fatalf("expected distinct workload ids for same-name workloads of different kinds")
 	}
 }
 
@@ -577,4 +661,8 @@ func assertAppearsInOrder(t *testing.T, input string, markers ...string) {
 		}
 		lastIndex = index
 	}
+}
+
+func testWorkloadID(kind, name string) string {
+	return WorkloadID(model.Workload{Name: name, Kind: kind})
 }
