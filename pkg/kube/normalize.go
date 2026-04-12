@@ -6,6 +6,7 @@ import (
 	"github.com/vieitesss/k8s-d2/pkg/model"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // NormalizeDeployment converts a Kubernetes Deployment into the shared workload model.
@@ -14,7 +15,7 @@ func NormalizeDeployment(dep appsv1.Deployment) model.Workload {
 		Name:         dep.Name,
 		Kind:         "Deployment",
 		Replicas:     replicasOrDefault(dep.Spec.Replicas),
-		Labels:       dep.Spec.Selector.MatchLabels,
+		Labels:       selectorMatchLabels(dep.Spec.Selector),
 		VolumeMounts: ExtractVolumeMounts(dep.Spec.Template.Spec.Containers, dep.Spec.Template.Spec.Volumes),
 	}
 }
@@ -27,7 +28,7 @@ func NormalizeStatefulSet(ss appsv1.StatefulSet) model.Workload {
 		Name:         ss.Name,
 		Kind:         "StatefulSet",
 		Replicas:     replicas,
-		Labels:       ss.Spec.Selector.MatchLabels,
+		Labels:       selectorMatchLabels(ss.Spec.Selector),
 		VolumeMounts: ExtractAllStatefulSetVolumeMounts(ss.Spec.Template.Spec.Containers, ss.Spec.Template.Spec.Volumes, ss.Spec.VolumeClaimTemplates, ss.Name, replicas),
 	}
 }
@@ -38,7 +39,7 @@ func NormalizeDaemonSet(ds appsv1.DaemonSet) model.Workload {
 		Name:         ds.Name,
 		Kind:         "DaemonSet",
 		Replicas:     ds.Status.DesiredNumberScheduled,
-		Labels:       ds.Spec.Selector.MatchLabels,
+		Labels:       selectorMatchLabels(ds.Spec.Selector),
 		VolumeMounts: ExtractVolumeMounts(ds.Spec.Template.Spec.Containers, ds.Spec.Template.Spec.Volumes),
 	}
 }
@@ -154,4 +155,11 @@ func requestedStorageCapacity(requests corev1.ResourceList) string {
 		return storage.String()
 	}
 	return ""
+}
+
+func selectorMatchLabels(selector *metav1.LabelSelector) map[string]string {
+	if selector == nil {
+		return map[string]string{}
+	}
+	return selector.MatchLabels
 }
