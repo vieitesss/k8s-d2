@@ -301,7 +301,7 @@ func (c *Client) fetchPVCs(ctx context.Context, nsName string, ns *model.Namespa
 			storageClass = *pvc.Spec.StorageClassName
 		}
 		capacity := ""
-		if storage, ok := pvc.Status.Capacity["storage"]; ok {
+		if storage, ok := pvc.Status.Capacity[corev1.ResourceStorage]; ok {
 			capacity = storage.String()
 		} else if storage, ok := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; ok {
 			capacity = storage.String()
