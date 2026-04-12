@@ -12,7 +12,7 @@ A command-line tool that generates [D2](https://d2lang.com/) diagram files from 
 
 > Note: This README tracks the `main` branch. If you are using the latest stable release, check the matching Git tag or the [release notes](https://github.com/vieitesss/k8s-d2/releases) for the shipped CLI behavior and flags.
 
-![k8s-d2 Example Diagram](dagger/cluster-with-storage.svg)
+![k8s-d2 Example Diagram](assets/example.svg)
 
 ## Features
 
