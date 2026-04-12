@@ -2,7 +2,6 @@ package validation
 
 import (
 	"bytes"
-	"fmt"
 
 	"github.com/vieitesss/k8s-d2/pkg/kube"
 	"github.com/vieitesss/k8s-d2/pkg/model"
@@ -108,25 +107,7 @@ func (p *FixtureParser) parseDeployment(doc []byte, ns *model.Namespace) error {
 		return err
 	}
 
-	replicas := int32(1) // Default replica count
-	if dep.Spec.Replicas != nil {
-		replicas = *dep.Spec.Replicas
-	}
-
-	volumeMounts := kube.ExtractVolumeMounts(
-		dep.Spec.Template.Spec.Containers,
-		dep.Spec.Template.Spec.Volumes,
-	)
-
-	workload := model.Workload{
-		Name:         dep.Name,
-		Kind:         "Deployment",
-		Replicas:     replicas,
-		Labels:       dep.Spec.Selector.MatchLabels,
-		VolumeMounts: volumeMounts,
-	}
-
-	ns.Deployments = append(ns.Deployments, workload)
+	ns.Deployments = append(ns.Deployments, kube.NormalizeDeployment(dep))
 	return nil
 }
 
@@ -137,31 +118,9 @@ func (p *FixtureParser) parseStatefulSet(doc []byte, ns *model.Namespace) error 
 		return err
 	}
 
-	replicas := int32(1) // Default replica count
-	if ss.Spec.Replicas != nil {
-		replicas = *ss.Spec.Replicas
-	}
-
-	// Extract volume mounts including generated names from volumeClaimTemplates
-	volumeMounts := kube.ExtractAllStatefulSetVolumeMounts(
-		ss.Spec.Template.Spec.Containers,
-		ss.Spec.Template.Spec.Volumes,
-		ss.Spec.VolumeClaimTemplates,
-		ss.Name,
-		replicas,
-	)
-
-	workload := model.Workload{
-		Name:         ss.Name,
-		Kind:         "StatefulSet",
-		Replicas:     replicas,
-		Labels:       ss.Spec.Selector.MatchLabels,
-		VolumeMounts: volumeMounts,
-	}
-
-	ns.StatefulSets = append(ns.StatefulSets, workload)
+	ns.StatefulSets = append(ns.StatefulSets, kube.NormalizeStatefulSet(ss))
 	if p.includeStorage {
-		ns.PVCs = append(ns.PVCs, statefulSetTemplatePVCs(&ss, replicas)...)
+		ns.PVCs = append(ns.PVCs, kube.NormalizeStatefulSetTemplatePVCs(ss)...)
 	}
 
 	return nil
@@ -174,20 +133,7 @@ func (p *FixtureParser) parseDaemonSet(doc []byte, ns *model.Namespace) error {
 		return err
 	}
 
-	volumeMounts := kube.ExtractVolumeMounts(
-		ds.Spec.Template.Spec.Containers,
-		ds.Spec.Template.Spec.Volumes,
-	)
-
-	workload := model.Workload{
-		Name:         ds.Name,
-		Kind:         "DaemonSet",
-		Replicas:     0, // DaemonSets don't have a fixed replica count
-		Labels:       ds.Spec.Selector.MatchLabels,
-		VolumeMounts: volumeMounts,
-	}
-
-	ns.DaemonSets = append(ns.DaemonSets, workload)
+	ns.DaemonSets = append(ns.DaemonSets, kube.NormalizeDaemonSet(ds))
 	return nil
 }
 
@@ -198,20 +144,7 @@ func (p *FixtureParser) parseService(doc []byte, ns *model.Namespace) error {
 		return err
 	}
 
-	service := model.Service{
-		Name:     svc.Name,
-		Type:     string(svc.Spec.Type),
-		Selector: svc.Spec.Selector,
-	}
-
-	for _, port := range svc.Spec.Ports {
-		service.Ports = append(service.Ports, model.Port{
-			Name:       port.Name,
-			Port:       port.Port,
-			TargetPort: kube.ServiceTargetPort(port),
-			NodePort:   port.NodePort,
-		})
-	}
+	service := kube.NormalizeService(svc)
 
 	ns.Services = append(ns.Services, service)
 	if entrypoint, ok := kube.EntrypointForService(service); ok {
@@ -238,50 +171,8 @@ func (p *FixtureParser) parsePVC(doc []byte, ns *model.Namespace) error {
 		return err
 	}
 
-	storageClass := ""
-	if pvc.Spec.StorageClassName != nil {
-		storageClass = *pvc.Spec.StorageClassName
-	}
-
-	capacity := ""
-	if storage, ok := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; ok {
-		capacity = storage.String()
-	}
-
-	pvcModel := model.PVC{
-		Name:         pvc.Name,
-		StorageClass: storageClass,
-		Capacity:     capacity,
-	}
-
-	ns.PVCs = append(ns.PVCs, pvcModel)
+	ns.PVCs = append(ns.PVCs, kube.NormalizePVC(pvc))
 	return nil
-}
-
-func statefulSetTemplatePVCs(ss *appsv1.StatefulSet, replicas int32) []model.PVC {
-	pvcs := make([]model.PVC, 0, len(ss.Spec.VolumeClaimTemplates)*int(replicas))
-
-	for _, template := range ss.Spec.VolumeClaimTemplates {
-		storageClass := ""
-		if template.Spec.StorageClassName != nil {
-			storageClass = *template.Spec.StorageClassName
-		}
-
-		capacity := ""
-		if storage, ok := template.Spec.Resources.Requests[corev1.ResourceStorage]; ok {
-			capacity = storage.String()
-		}
-
-		for i := range replicas {
-			pvcs = append(pvcs, model.PVC{
-				Name:         fmt.Sprintf("%s-%s-%d", template.Name, ss.Name, i),
-				StorageClass: storageClass,
-				Capacity:     capacity,
-			})
-		}
-	}
-
-	return pvcs
 }
 
 // parseConfigMap increments the ConfigMap count for the namespace
@@ -291,7 +182,9 @@ func (p *FixtureParser) parseConfigMap(doc []byte, ns *model.Namespace) error {
 		return err
 	}
 
-	ns.ConfigMaps++
+	if !kube.IsSystemConfigMap(cm.Name) {
+		ns.ConfigMaps++
+	}
 	return nil
 }
 
@@ -302,6 +195,8 @@ func (p *FixtureParser) parseSecret(doc []byte, ns *model.Namespace) error {
 		return err
 	}
 
-	ns.Secrets++
+	if !kube.IsSystemSecret(secret.Name, secret.Type) {
+		ns.Secrets++
+	}
 	return nil
 }
