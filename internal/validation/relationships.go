@@ -54,20 +54,13 @@ func (rd *RelationshipDeriver) EntrypointToServiceConnections(ns *model.Namespac
 func (rd *RelationshipDeriver) ServiceToWorkloadConnections(ns *model.Namespace) []Connection {
 	var connections []Connection
 
-	// Get all workloads in the namespace
-	allWorkloads := []model.Workload{}
-	allWorkloads = append(allWorkloads, ns.Deployments...)
-	allWorkloads = append(allWorkloads, ns.StatefulSets...)
-	allWorkloads = append(allWorkloads, ns.DaemonSets...)
-
 	for _, svc := range ns.Services {
 		svcID := render.ServiceID(svc.Name)
-		for _, w := range allWorkloads {
+		for _, w := range model.AllWorkloads(ns) {
 			if render.LabelsMatch(svc.Selector, w.Labels) {
-				wID := render.SanitizeID(w.Name)
 				connections = append(connections, Connection{
 					From: svcID,
-					To:   wID,
+					To:   render.WorkloadID(w),
 					Type: "service-to-workload",
 				})
 			}
@@ -81,14 +74,8 @@ func (rd *RelationshipDeriver) ServiceToWorkloadConnections(ns *model.Namespace)
 func (rd *RelationshipDeriver) WorkloadToPVCConnections(ns *model.Namespace) []Connection {
 	var connections []Connection
 
-	// Get all workloads in the namespace
-	allWorkloads := []model.Workload{}
-	allWorkloads = append(allWorkloads, ns.Deployments...)
-	allWorkloads = append(allWorkloads, ns.StatefulSets...)
-	allWorkloads = append(allWorkloads, ns.DaemonSets...)
-
-	for _, w := range allWorkloads {
-		wID := render.SanitizeID(w.Name)
+	for _, w := range model.AllWorkloads(ns) {
+		wID := render.WorkloadID(w)
 
 		// Group by PVC name (handle same PVC mounted at multiple paths)
 		mountsByPVC := make(map[string][]model.VolumeMount)

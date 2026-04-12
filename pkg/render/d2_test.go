@@ -514,6 +514,14 @@ func TestSanitizeID_AvoidsLossyCollisions(t *testing.T) {
 	}
 }
 
+func TestWorkloadID_UsesSanitizedName(t *testing.T) {
+	workload := model.Workload{Name: "api.v2", Kind: "Deployment"}
+
+	if got, want := WorkloadID(workload), SanitizeID("api.v2"); got != want {
+		t.Fatalf("WorkloadID(%+v) = %q, want %q", workload, got, want)
+	}
+}
+
 func TestQuoteString_EscapesQuotesAndNewlines(t *testing.T) {
 	input := "name \"quoted\"\nnext"
 	if got, want := QuoteString(input), strconv.Quote(input); got != want {
