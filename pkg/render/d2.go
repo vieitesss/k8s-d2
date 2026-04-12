@@ -197,7 +197,7 @@ func (r *D2Renderer) writePVCs(b *strings.Builder, ns *model.Namespace, indent s
 }
 
 func (r *D2Renderer) writeWorkload(b *strings.Builder, w *model.Workload, indent string) {
-	wID := SanitizeID(w.Name)
+	wID := WorkloadID(w.Kind, w.Name)
 
 	fmt.Fprintf(b, "%s  %s: {\n", indent, wID)
 	fmt.Fprintf(b, "%s    label: %s\n", indent, QuoteString(WorkloadLabel(*w)))
@@ -251,7 +251,7 @@ func (r *D2Renderer) writeWorkloadPVCConnections(b *strings.Builder, ns *model.N
 				continue
 			}
 
-			workloadID := SanitizeID(w.Name)
+			workloadID := WorkloadID(w.Kind, w.Name)
 
 			// Group mounts by PVC (handle case where same PVC mounted at multiple paths)
 			mountsByPVC := make(map[string][]model.VolumeMount)
@@ -297,7 +297,7 @@ func (r *D2Renderer) writeServiceConnections(b *strings.Builder, svc *model.Serv
 	for _, workloads := range allWorkloads {
 		for _, w := range workloads {
 			if LabelsMatch(svc.Selector, w.Labels) {
-				wID := SanitizeID(w.Name)
+				wID := WorkloadID(w.Kind, w.Name)
 				fmt.Fprintf(b, "%s  %s -> %s\n", indent, svcID, wID)
 			}
 		}
@@ -512,6 +512,11 @@ func legendEntries(cluster *model.Cluster) []legendEntry {
 // D2 path syntax from reinterpreting characters like dots.
 func SanitizeID(s string) string {
 	return "id_" + hex.EncodeToString([]byte(s))
+}
+
+// WorkloadID returns the rendered D2 identifier for a workload node.
+func WorkloadID(kind, name string) string {
+	return SanitizeID(strings.ToLower(kind) + ":" + name)
 }
 
 // EntrypointID returns the rendered D2 identifier for an Entrypoint node.

@@ -120,7 +120,7 @@ func (v *D2Validator) ValidateResources() error {
 		allWorkloads = append(allWorkloads, ns.DaemonSets...)
 
 		for _, w := range allWorkloads {
-			wID := render.SanitizeID(w.Name)
+			wID := render.WorkloadID(w.Kind, w.Name)
 			if !containsD2Line(namespaceBlock, fmt.Sprintf("%s: {", wID)) {
 				return fmt.Errorf("missing workload: %s (%s)", w.Name, w.Kind)
 			}
