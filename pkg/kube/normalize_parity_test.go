@@ -332,7 +332,7 @@ func renderCluster(t *testing.T, cluster *model.Cluster) string {
 	t.Helper()
 
 	var buf bytes.Buffer
-	renderer := render.NewD2Renderer(&buf, 0)
+	renderer := render.NewD2Renderer(&buf)
 	if err := renderer.Render(cluster); err != nil {
 		t.Fatalf("render cluster: %v", err)
 	}

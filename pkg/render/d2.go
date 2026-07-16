@@ -16,12 +16,8 @@ type D2Renderer struct {
 }
 
 // NewD2Renderer constructs a D2 renderer.
-// gridColumns is deprecated and ignored; D2 now uses automatic layout.
-func NewD2Renderer(w io.Writer, gridColumns int) *D2Renderer {
-	_ = gridColumns
-	return &D2Renderer{
-		w: w,
-	}
+func NewD2Renderer(w io.Writer) *D2Renderer {
+	return &D2Renderer{w: w}
 }
 
 func (r *D2Renderer) Render(cluster *model.Cluster) error {

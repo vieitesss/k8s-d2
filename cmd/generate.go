@@ -139,7 +139,7 @@ func getOutputWriter() (*os.File, func(), error) {
 
 func renderWithSpinner(cluster *model.Cluster, w *os.File) error {
 	return runWithSpinner("Rendering D2 diagram...", func() error {
-		renderer := render.NewD2Renderer(w, rootOptions.gridColumns)
+		renderer := render.NewD2Renderer(w)
 		return renderer.Render(cluster)
 	})
 }
@@ -155,7 +155,7 @@ func generateImage(cluster *model.Cluster) error {
 	var buf bytes.Buffer
 
 	if err := runWithSpinner("Rendering D2 diagram...", func() error {
-		renderer := render.NewD2Renderer(&buf, rootOptions.gridColumns)
+		renderer := render.NewD2Renderer(&buf)
 		return renderer.Render(cluster)
 	}); err != nil {
 		return err

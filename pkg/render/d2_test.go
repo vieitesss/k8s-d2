@@ -153,7 +153,7 @@ func TestRenderLegend_IncludesOnlyRenderedResourceTypes(t *testing.T) {
 	}
 }
 
-func TestRender_IgnoresDeprecatedGridColumns(t *testing.T) {
+func TestRender_UsesAutomaticLayout(t *testing.T) {
 	cluster := &model.Cluster{
 		Namespaces: []model.Namespace{
 			{
@@ -175,7 +175,7 @@ func TestRender_IgnoresDeprecatedGridColumns(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	renderer := NewD2Renderer(&buf, 4)
+	renderer := NewD2Renderer(&buf)
 	if err := renderer.Render(cluster); err != nil {
 		t.Fatalf("render failed: %v", err)
 	}
@@ -609,7 +609,7 @@ func renderTestCluster(t *testing.T, cluster *model.Cluster) string {
 	t.Helper()
 
 	var buf bytes.Buffer
-	renderer := NewD2Renderer(&buf, 0)
+	renderer := NewD2Renderer(&buf)
 	if err := renderer.Render(cluster); err != nil {
 		t.Fatalf("render failed: %v", err)
 	}

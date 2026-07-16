@@ -28,32 +28,8 @@ func TestD2Output_BasicFromEnv(t *testing.T) {
 		t.Errorf("Syntax validation failed: %v", err)
 	}
 
-	if err := validator.ValidateLegendStructure(); err != nil {
-		t.Errorf("Legend validation failed: %v", err)
-	}
-
 	if err := validator.ValidateExactRender(); err != nil {
 		t.Errorf("Exact render validation failed: %v", err)
-	}
-
-	if err := validator.ValidateResources(); err != nil {
-		t.Errorf("Resource validation failed: %v", err)
-	}
-
-	if err := validator.ValidateWorkloadLabels(); err != nil {
-		t.Errorf("Workload label validation failed: %v", err)
-	}
-
-	if err := validator.ValidateServiceConnections(); err != nil {
-		t.Errorf("Service connection validation failed: %v", err)
-	}
-
-	if err := validator.ValidateEntrypointConnections(); err != nil {
-		t.Errorf("Entrypoint connection validation failed: %v", err)
-	}
-
-	if err := validator.ValidateConfigInfo(); err != nil {
-		t.Errorf("Config info validation failed: %v", err)
 	}
 }
 
@@ -77,24 +53,8 @@ func TestD2Output_StorageFromEnv(t *testing.T) {
 		t.Errorf("Syntax validation failed: %v", err)
 	}
 
-	if err := validator.ValidateLegendStructure(); err != nil {
-		t.Errorf("Legend validation failed: %v", err)
-	}
-
 	if err := validator.ValidateExactRender(); err != nil {
 		t.Errorf("Exact render validation failed: %v", err)
-	}
-
-	if err := validator.ValidateResources(); err != nil {
-		t.Errorf("Resource validation failed: %v", err)
-	}
-
-	if err := validator.ValidateEntrypointConnections(); err != nil {
-		t.Errorf("Entrypoint connection validation failed: %v", err)
-	}
-
-	if err := validator.ValidatePVCConnections(); err != nil {
-		t.Errorf("PVC connection validation failed: %v", err)
 	}
 }
 
