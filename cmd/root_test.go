@@ -87,7 +87,7 @@ func TestIncludeStorageFlagKeepsPVCOnlyRenderContract(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	renderer := render.NewD2Renderer(&buf, 0)
+	renderer := render.NewD2Renderer(&buf)
 	if err := renderer.Render(cluster); err != nil {
 		t.Fatalf("failed to render storage fixtures: %v", err)
 	}
@@ -143,12 +143,8 @@ func TestGridColumnsFlagIsStillAccepted(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rootOptions.gridColumns = 3
 			if err := tt.cmd.ParseFlags(tt.args); err != nil {
 				t.Fatalf("expected deprecated grid-columns flag to remain accepted: %v", err)
-			}
-			if rootOptions.gridColumns == 3 {
-				t.Fatalf("expected deprecated grid-columns flag to still parse a value")
 			}
 		})
 	}

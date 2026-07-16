@@ -94,7 +94,7 @@ func NormalizeStatefulSetTemplatePVCs(ss appsv1.StatefulSet) []model.PVC {
 		capacity := requestedStorageCapacity(template.Spec.Resources.Requests)
 		for i := range replicas {
 			pvcs = append(pvcs, model.PVC{
-				Name:         fmt.Sprintf("%s-%s-%d", template.Name, ss.Name, i),
+				Name:         statefulSetPVCName(template.Name, ss.Name, i),
 				StorageClass: storageClass,
 				Capacity:     capacity,
 			})
@@ -134,6 +134,10 @@ func IsSystemConfigMap(name string) bool {
 // IsSystemSecret reports whether a Secret should be excluded from topology counts.
 func IsSystemSecret(name string, secretType corev1.SecretType) bool {
 	return isSystemSecret(name, secretType)
+}
+
+func statefulSetPVCName(templateName, statefulSetName string, ordinal int32) string {
+	return fmt.Sprintf("%s-%s-%d", templateName, statefulSetName, ordinal)
 }
 
 func replicasOrDefault(replicas *int32) int32 {

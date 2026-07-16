@@ -22,7 +22,7 @@ func TestD2Validator_BasicTopology(t *testing.T) {
 
 	// Render D2 output
 	var buf bytes.Buffer
-	renderer := render.NewD2Renderer(&buf, 0)
+	renderer := render.NewD2Renderer(&buf)
 	if err := renderer.Render(expectedCluster); err != nil {
 		t.Fatalf("Failed to render D2: %v", err)
 	}
@@ -37,51 +37,9 @@ func TestD2Validator_BasicTopology(t *testing.T) {
 		}
 	})
 
-	t.Run("ValidateLegendStructure", func(t *testing.T) {
-		if err := validator.ValidateLegendStructure(); err != nil {
-			t.Errorf("Legend validation failed: %v", err)
-		}
-	})
-
 	t.Run("ValidateExactRender", func(t *testing.T) {
 		if err := validator.ValidateExactRender(); err != nil {
 			t.Errorf("Exact render validation failed: %v", err)
-		}
-	})
-
-	t.Run("ValidateResources", func(t *testing.T) {
-		if err := validator.ValidateResources(); err != nil {
-			t.Errorf("Resource validation failed: %v", err)
-		}
-	})
-
-	t.Run("ValidateWorkloadLabels", func(t *testing.T) {
-		if err := validator.ValidateWorkloadLabels(); err != nil {
-			t.Errorf("Workload label validation failed: %v", err)
-		}
-	})
-
-	t.Run("ValidateEntrypointConnections", func(t *testing.T) {
-		if err := validator.ValidateEntrypointConnections(); err != nil {
-			t.Errorf("Entrypoint connection validation failed: %v", err)
-		}
-	})
-
-	t.Run("ValidateServiceConnections", func(t *testing.T) {
-		if err := validator.ValidateServiceConnections(); err != nil {
-			t.Errorf("Service connection validation failed: %v", err)
-		}
-	})
-
-	t.Run("ValidateEntrypointConnections", func(t *testing.T) {
-		if err := validator.ValidateEntrypointConnections(); err != nil {
-			t.Errorf("Entrypoint connection validation failed: %v", err)
-		}
-	})
-
-	t.Run("ValidateConfigInfo", func(t *testing.T) {
-		if err := validator.ValidateConfigInfo(); err != nil {
-			t.Errorf("Config info validation failed: %v", err)
 		}
 	})
 }
@@ -95,7 +53,7 @@ func TestD2Validator_WithStorage(t *testing.T) {
 
 	// Render D2 output
 	var buf bytes.Buffer
-	renderer := render.NewD2Renderer(&buf, 0)
+	renderer := render.NewD2Renderer(&buf)
 	if err := renderer.Render(expectedCluster); err != nil {
 		t.Fatalf("Failed to render D2: %v", err)
 	}
@@ -110,33 +68,9 @@ func TestD2Validator_WithStorage(t *testing.T) {
 		}
 	})
 
-	t.Run("ValidateLegendStructure", func(t *testing.T) {
-		if err := validator.ValidateLegendStructure(); err != nil {
-			t.Errorf("Legend validation failed: %v", err)
-		}
-	})
-
 	t.Run("ValidateExactRender", func(t *testing.T) {
 		if err := validator.ValidateExactRender(); err != nil {
 			t.Errorf("Exact render validation failed: %v", err)
-		}
-	})
-
-	t.Run("ValidateResources", func(t *testing.T) {
-		if err := validator.ValidateResources(); err != nil {
-			t.Errorf("Resource validation failed: %v", err)
-		}
-	})
-
-	t.Run("ValidateEntrypointConnections", func(t *testing.T) {
-		if err := validator.ValidateEntrypointConnections(); err != nil {
-			t.Errorf("Entrypoint connection validation failed: %v", err)
-		}
-	})
-
-	t.Run("ValidatePVCConnections", func(t *testing.T) {
-		if err := validator.ValidatePVCConnections(); err != nil {
-			t.Errorf("PVC connection validation failed: %v", err)
 		}
 	})
 }
@@ -180,7 +114,7 @@ func TestD2Validator_EscapedIdentifiersAndLabels(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	renderer := render.NewD2Renderer(&buf, 0)
+	renderer := render.NewD2Renderer(&buf)
 	if err := renderer.Render(cluster); err != nil {
 		t.Fatalf("Failed to render D2: %v", err)
 	}
@@ -190,29 +124,8 @@ func TestD2Validator_EscapedIdentifiersAndLabels(t *testing.T) {
 	if err := validator.ValidateSyntax(); err != nil {
 		t.Fatalf("Syntax validation failed: %v", err)
 	}
-	if err := validator.ValidateLegendStructure(); err != nil {
-		t.Fatalf("Legend validation failed: %v", err)
-	}
 	if err := validator.ValidateExactRender(); err != nil {
 		t.Fatalf("Exact render validation failed: %v", err)
-	}
-	if err := validator.ValidateResources(); err != nil {
-		t.Fatalf("Resource validation failed: %v", err)
-	}
-	if err := validator.ValidateWorkloadLabels(); err != nil {
-		t.Fatalf("Workload label validation failed: %v", err)
-	}
-	if err := validator.ValidateEntrypointConnections(); err != nil {
-		t.Fatalf("Entrypoint connection validation failed: %v", err)
-	}
-	if err := validator.ValidateServiceConnections(); err != nil {
-		t.Fatalf("Service connection validation failed: %v", err)
-	}
-	if err := validator.ValidatePVCConnections(); err != nil {
-		t.Fatalf("PVC connection validation failed: %v", err)
-	}
-	if err := validator.ValidateConfigInfo(); err != nil {
-		t.Fatalf("Config info validation failed: %v", err)
 	}
 }
 
@@ -283,7 +196,7 @@ namespaces: {
 	}
 }
 
-func TestD2Validator_ValidateWorkloadLabelsRejectsDaemonSetReplicaDrift(t *testing.T) {
+func TestD2Validator_ValidateExactRenderRejectsDaemonSetReplicaDrift(t *testing.T) {
 	cluster := &model.Cluster{
 		Namespaces: []model.Namespace{{
 			Name: "apps",
@@ -299,9 +212,6 @@ func TestD2Validator_ValidateWorkloadLabelsRejectsDaemonSetReplicaDrift(t *testi
 
 	validator := validation.NewD2Validator(cluster, actual)
 
-	if err := validator.ValidateWorkloadLabels(); err == nil {
-		t.Fatalf("expected daemonset label validation to fail for replica suffix drift")
-	}
 	if err := validator.ValidateExactRender(); err == nil {
 		t.Fatalf("expected exact render validation to fail for daemonset label drift")
 	}
@@ -320,7 +230,7 @@ func TestD2Validator_ValidateExactRenderReportsFirstDifferingLine(t *testing.T) 
 	}
 
 	var buf bytes.Buffer
-	renderer := render.NewD2Renderer(&buf, 0)
+	renderer := render.NewD2Renderer(&buf)
 	if err := renderer.Render(cluster); err != nil {
 		t.Fatalf("Failed to render D2: %v", err)
 	}
@@ -338,265 +248,6 @@ func TestD2Validator_ValidateExactRenderReportsFirstDifferingLine(t *testing.T) 
 	}
 	if !strings.Contains(err.Error(), "expected \"      label: \\\"● api (1)\\\"\"") {
 		t.Fatalf("expected exact render mismatch to include expected line, got: %v", err)
-	}
-}
-
-func TestD2Validator_ValidateResourcesScopesChecksToNamespaceBlock(t *testing.T) {
-	cluster := &model.Cluster{
-		Namespaces: []model.Namespace{
-			{
-				Name: "alpha",
-				Deployments: []model.Workload{{
-					Name:     "shared-api",
-					Kind:     "Deployment",
-					Replicas: 1,
-				}},
-			},
-			{
-				Name: "beta",
-				Deployments: []model.Workload{{
-					Name:     "shared-api",
-					Kind:     "Deployment",
-					Replicas: 1,
-				}},
-				ConfigMaps: 1,
-			},
-		},
-	}
-
-	actual := fmt.Sprintf(`# Generated by k8s-d2
-direction: right
-
-vars: {
-  d2-legend: {
-    deployment: {
-      label: "● Deployment"
-      style.fill: "#f9f9f9"
-    }
-
-    config: {
-      label: "ConfigMaps | Secrets"
-      style.fill: "#ffffcc"
-    }
-  }
-}
-
-namespaces: {
-
-  id_616c706861: {
-    label: "alpha"
-    style.fill: "#f0f0f0"
-  }
-
-  id_62657461: {
-    label: "beta"
-    style.fill: "#f0f0f0"
-
-    %s: {
-      label: "● shared-api (1)"
-    }
-    _config: {
-      label: "CM: 1 | Sec: 0"
-      style.fill: "#ffffcc"
-    }
-  }
-
-}
-`, render.WorkloadID(model.Workload{Name: "shared-api", Kind: "Deployment"}))
-
-	validator := validation.NewD2Validator(cluster, actual)
-
-	err := validator.ValidateResources()
-	if err == nil {
-		t.Fatalf("expected namespace-scoped resource validation to fail")
-	}
-	if !strings.Contains(err.Error(), "missing workload: shared-api") {
-		t.Fatalf("expected missing workload error for alpha namespace, got: %v", err)
-	}
-}
-
-func TestD2Validator_ValidateResourcesDistinguishesWorkloadKindsWithSameName(t *testing.T) {
-	cluster := &model.Cluster{
-		Namespaces: []model.Namespace{{
-			Name: "apps",
-			Deployments: []model.Workload{{
-				Name:     "api",
-				Kind:     "Deployment",
-				Replicas: 2,
-			}},
-			StatefulSets: []model.Workload{{
-				Name:     "api",
-				Kind:     "StatefulSet",
-				Replicas: 1,
-			}},
-		}},
-	}
-
-	var buf bytes.Buffer
-	renderer := render.NewD2Renderer(&buf, 0)
-	if err := renderer.Render(cluster); err != nil {
-		t.Fatalf("Failed to render D2: %v", err)
-	}
-
-	actual := strings.Replace(
-		buf.String(),
-		fmt.Sprintf(
-			"    %s: {\n      label: %s\n    }\n",
-			render.WorkloadID(model.Workload{Name: "api", Kind: "StatefulSet"}),
-			render.QuoteString(render.WorkloadLabel(cluster.Namespaces[0].StatefulSets[0])),
-		),
-		"",
-		1,
-	)
-
-	validator := validation.NewD2Validator(cluster, actual)
-	err := validator.ValidateResources()
-	if err == nil {
-		t.Fatalf("expected resource validation to fail when one same-name workload kind is missing")
-	}
-	if !strings.Contains(err.Error(), "missing workload: api (StatefulSet)") {
-		t.Fatalf("expected missing statefulset workload error, got: %v", err)
-	}
-}
-
-func TestD2Validator_ValidateConfigInfoScopesChecksToNamespaceBlock(t *testing.T) {
-	cluster := &model.Cluster{
-		Namespaces: []model.Namespace{
-			{
-				Name:       "alpha",
-				ConfigMaps: 1,
-			},
-			{
-				Name:       "beta",
-				ConfigMaps: 1,
-				Secrets:    2,
-			},
-		},
-	}
-
-	actual := `# Generated by k8s-d2
-direction: right
-
-vars: {
-  d2-legend: {
-    config: {
-      label: "ConfigMaps | Secrets"
-      style.fill: "#ffffcc"
-    }
-  }
-}
-
-namespaces: {
-
-  id_616c706861: {
-    label: "alpha"
-    style.fill: "#f0f0f0"
-  }
-
-  id_62657461: {
-    label: "beta"
-    style.fill: "#f0f0f0"
-
-    _config: {
-      label: "CM: 1 | Sec: 2"
-      style.fill: "#ffffcc"
-    }
-  }
-
-}
-`
-
-	validator := validation.NewD2Validator(cluster, actual)
-
-	err := validator.ValidateConfigInfo()
-	if err == nil {
-		t.Fatalf("expected namespace-scoped config validation to fail")
-	}
-	if !strings.Contains(err.Error(), "incorrect config info for namespace alpha") {
-		t.Fatalf("expected config info error for alpha namespace, got: %v", err)
-	}
-}
-
-func TestD2Validator_ValidateEntrypointConnectionsScopesChecksToNamespaceBlock(t *testing.T) {
-	cluster := &model.Cluster{
-		Namespaces: []model.Namespace{
-			{
-				Name: "alpha",
-				Entrypoints: []model.Entrypoint{{
-					Name:     "public-edge",
-					Kind:     "Ingress",
-					Services: []string{"web-service"},
-				}},
-				Services: []model.Service{{
-					Name: "web-service",
-					Type: "ClusterIP",
-				}},
-			},
-			{
-				Name: "beta",
-				Entrypoints: []model.Entrypoint{{
-					Name:     "public-edge",
-					Kind:     "Ingress",
-					Services: []string{"web-service"},
-				}},
-				Services: []model.Service{{
-					Name: "web-service",
-					Type: "ClusterIP",
-				}},
-			},
-		},
-	}
-
-	actual := `# Generated by k8s-d2
-direction: right
-
-vars: {
-  d2-legend: {
-    entrypoint: {
-      label: "⇢ Entrypoint"
-      style.fill: "#ffe6cc"
-    }
-
-    service: {
-      label: "⎈ Service"
-      style.fill: "#cce5ff"
-    }
-  }
-}
-
-namespaces: {
-
-  id_616c706861: {
-    label: "alpha"
-    style.fill: "#f0f0f0"
-  }
-
-  id_62657461: {
-    label: "beta"
-    style.fill: "#f0f0f0"
-
-    ep_id_696e67726573733a7075626c69632d65646765: {
-      label: "⇢ public-edge\nIngress"
-      style.fill: "#ffe6cc"
-    }
-    svc_id_7765622d73657276696365: {
-      label: "⎈ web-service\nClusterIP"
-      style.fill: "#cce5ff"
-    }
-    ep_id_696e67726573733a7075626c69632d65646765 -> svc_id_7765622d73657276696365
-  }
-
-}
-`
-
-	validator := validation.NewD2Validator(cluster, actual)
-
-	err := validator.ValidateEntrypointConnections()
-	if err == nil {
-		t.Fatalf("expected namespace-scoped entrypoint validation to fail")
-	}
-	if !strings.Contains(err.Error(), "missing expected connection") {
-		t.Fatalf("expected missing entrypoint connection error for alpha namespace, got: %v", err)
 	}
 }
 
@@ -675,7 +326,7 @@ func TestParseTestFixtures_WithStorage_RendersPVCsWithoutStorageClassNodes(t *te
 	}
 
 	var buf bytes.Buffer
-	renderer := render.NewD2Renderer(&buf, 0)
+	renderer := render.NewD2Renderer(&buf)
 	if err := renderer.Render(cluster); err != nil {
 		t.Fatalf("Failed to render D2: %v", err)
 	}

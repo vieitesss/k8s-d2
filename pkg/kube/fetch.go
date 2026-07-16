@@ -310,8 +310,7 @@ func ExtractAllStatefulSetPVCNames(volumes []corev1.Volume, templates []corev1.P
 	// Add generated names from volumeClaimTemplates
 	for _, vct := range templates {
 		for i := range replicas {
-			pvcName := fmt.Sprintf("%s-%s-%d", vct.Name, ssName, i)
-			pvcNames = append(pvcNames, pvcName)
+			pvcNames = append(pvcNames, statefulSetPVCName(vct.Name, ssName, i))
 		}
 	}
 
@@ -387,7 +386,7 @@ func ExtractAllStatefulSetVolumeMounts(
 	for _, vct := range templates {
 		mountTemplates := templateMounts[vct.Name]
 		for i := range replicas {
-			pvcName := fmt.Sprintf("%s-%s-%d", vct.Name, ssName, i)
+			pvcName := statefulSetPVCName(vct.Name, ssName, i)
 			for _, mt := range mountTemplates {
 				mounts = append(mounts, model.VolumeMount{
 					PVCName:   pvcName,

@@ -17,7 +17,6 @@ type RootOptions struct {
 	krokiBaseURL   string
 	krokiTimeout   time.Duration
 	includeStorage bool
-	gridColumns    int
 	showVersion    bool
 	quiet          bool
 }
@@ -59,7 +58,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&rootOptions.krokiBaseURL, "kroki-base-url", kroki.DefaultBaseURL, "Kroki base URL for SVG generation")
 	rootCmd.PersistentFlags().DurationVar(&rootOptions.krokiTimeout, "kroki-timeout", kroki.DefaultTimeout, "Kroki request timeout for SVG generation")
 	rootCmd.PersistentFlags().BoolVar(&rootOptions.includeStorage, "include-storage", false, includeStorageUsage)
-	rootCmd.PersistentFlags().IntVar(&rootOptions.gridColumns, "grid-columns", 3, "deprecated: automatic layout is used")
+	rootCmd.PersistentFlags().Int("grid-columns", 3, "deprecated: automatic layout is used")
 	if err := rootCmd.PersistentFlags().MarkDeprecated("grid-columns", "automatic layout is now used; this flag has no effect"); err != nil {
 		panic(err)
 	}
