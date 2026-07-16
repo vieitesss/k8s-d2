@@ -98,13 +98,18 @@ place topology-to-D2 rules live.
   renderer tests (`pkg/render`) after removal to confirm exact-render still passes
   on all existing fixtures.
 
+## Scope boundary
+
+This spec describes the validator-collapse seam. This PR also includes the related
+cleanup documented in `specs/consolidate-remaining-architecture-findings.md`:
+removing dead `gridColumns` renderer plumbing and centralizing StatefulSet PVC
+naming. Those changes preserve renderer output and do not add validation-side
+derivation.
+
 ## Out of Scope
 
-- Any change to renderer output or the `render` package interface (including the
-  dead `gridColumns` parameter — that is candidate 4).
 - Extracting a shared `model.Connections` seam (candidate 2).
-- Consolidating the StatefulSet PVC naming rule (candidate 3).
-- Fixture format, `FixtureParser`, or `kube` normalization changes.
+- Fixture format, `FixtureParser`, or unrelated `kube` normalization changes.
 - New validation capabilities beyond syntax + exact render.
 
 ## Further Notes
